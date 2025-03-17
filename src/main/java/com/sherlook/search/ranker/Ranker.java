@@ -1,4 +1,4 @@
-package com.sherlook.ranker;
+package com.sherlook.search.ranker;
 
 import org.springframework.stereotype.Component;
 

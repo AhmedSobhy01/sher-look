@@ -1,11 +1,11 @@
-package com.sherlook;
+package com.sherlook.search;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 
-import com.sherlook.crawler.Crawler;
-import com.sherlook.indexer.Indexer;
+import com.sherlook.search.crawler.Crawler;
+import com.sherlook.search.indexer.Indexer;
 
 @SpringBootApplication
 public class Application {

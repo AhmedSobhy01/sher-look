@@ -1,4 +1,4 @@
-package com.sherlook.indexer;
+package com.sherlook.search.indexer;
 
 import org.springframework.stereotype.Component;
 

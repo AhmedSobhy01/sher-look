@@ -1,4 +1,4 @@
-package com.sherlook.utils;
+package com.sherlook.search.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

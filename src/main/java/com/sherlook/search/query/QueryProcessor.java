@@ -1,4 +1,4 @@
-package com.sherlook.query;
+package com.sherlook.search.query;
 
 import org.springframework.stereotype.Component;
 

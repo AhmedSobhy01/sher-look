@@ -1,4 +1,4 @@
-package com.sherlook.web;
+package com.sherlook.search.web;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;

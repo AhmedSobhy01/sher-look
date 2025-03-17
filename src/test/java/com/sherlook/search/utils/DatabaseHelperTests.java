@@ -1,4 +1,4 @@
-package com.sherlook.utils;
+package com.sherlook.search.utils;
 
 import java.util.List;
 import java.util.Map;

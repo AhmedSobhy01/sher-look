@@ -1,4 +1,4 @@
-package com.sherlook.utils;
+package com.sherlook.search.utils;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
