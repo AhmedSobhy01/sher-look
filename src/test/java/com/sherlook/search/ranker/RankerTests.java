@@ -1,4 +1,3 @@
 package com.sherlook.search.ranker;
 
-class RankerTests {
-}
+class RankerTests {}

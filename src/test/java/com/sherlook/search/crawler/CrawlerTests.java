@@ -1,4 +1,3 @@
 package com.sherlook.search.crawler;
 
-class CrawlerTests {
-}
+class CrawlerTests {}
