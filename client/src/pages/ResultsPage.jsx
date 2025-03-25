@@ -9,7 +9,7 @@ const ResultsPage = function () {
   const navigate = useNavigate();
   const data = useLoaderData();
   data.data.sort((a, b) => a.id - b.id);
-  console.log(data);
+  
   return (
     <div>
       <header className="flex items-center justify-left mb-4 shadow-sm py-4 px-8">
