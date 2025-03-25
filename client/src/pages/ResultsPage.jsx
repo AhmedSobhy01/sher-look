@@ -9,7 +9,7 @@ const ResultsPage = function () {
   const navigate = useNavigate();
   const data = useLoaderData();
   data.data.sort((a, b) => a.id - b.id);
-  
+
   return (
     <div>
       <header className="flex items-center justify-left mb-4 shadow-sm py-4 px-8">
@@ -31,10 +31,10 @@ const ResultsPage = function () {
           {data.data.map((result) => (
             <li key={result.Url} className="gap-4 my-4">
               <a href={result.Url} target="_blank" rel="noopener noreferrer">
-                <h2 className="text-xl font-semibold hover:underline">
+                <p className="text-xl font-semibold hover:underline decoration-2">
                   {result.title}
-                </h2>
-                <p className="text-slate-800 text-sm">{result.Url}</p>
+                </p>
+                <p className="text-sky-700 text-sm">{result.Url}</p>
                 <HighlightText
                   text={result.description}
                   highlights={result.highlights}
