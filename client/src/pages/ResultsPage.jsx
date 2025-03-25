@@ -3,10 +3,12 @@ import SearchBar from "@/components/SearchBar";
 import { useLoaderData } from "react-router";
 import Logo from "@/assets/Logo.png";
 import { useNavigate } from "react-router";
+import HighlightText from "@/components/HighlightedText";
 
 const ResultsPage = function () {
   const navigate = useNavigate();
   const data = useLoaderData();
+  data.data.sort((a, b) => a.id - b.id);
   console.log(data);
   return (
     <div>
@@ -33,7 +35,11 @@ const ResultsPage = function () {
                   {result.title}
                 </h2>
                 <p className="text-slate-800 text-sm">{result.Url}</p>
-                <p className="text-zinc-500 text-sm">{result.description}</p>
+                <HighlightText
+                  text={result.description}
+                  highlights={result.highlights}
+                  className="text-zinc-500 text-sm"
+                />
               </a>
             </li>
           ))}
@@ -47,28 +53,76 @@ ResultsPage.loader = async function ({ request }) {
   const searchParams = new URL(request.url).searchParams;
   const searchTerm = searchParams.get("q");
 
-
   // TODO: Fetch search results from the backend
   const dummyResponse = {
     query: searchTerm,
     data: [
       {
+        id: 2,
         Url: "https://www.google.com",
         title: "Google",
         description:
           "Search the world's information, including webpages, images, videos and more. Google has many special features to help you find exactly what you're looking for.",
+        highlights: [
+          "search",
+          "information",
+          "webpages",
+          "images",
+          "videos",
+          "features",
+          "find",
+          "looking",
+        ],
       },
       {
+        id: 1,
         Url: "https://www.bing.com",
         title: "Bing",
         description:
           "Bing helps you turn information into action, making it faster and easier to go from searching to doing.",
+        highlights: [
+          "information",
+          "action",
+          "making",
+          "faster",
+          "easier",
+          "searching",
+          "doing",
+        ],
       },
       {
+        id: 4,
+        Url: "https://www.duckduckgo.com",
+        title: "DuckDuckGo",
+        description:
+          "The Internet privacy company that empowers you to seamlessly take control of your personal information online, without any tradeoffs.",
+
+        highlights: [
+          "Internet",
+          "privacy",
+          "company",
+          "empowers",
+          "seamlessly",
+          "control",
+          "personal",
+          "information",
+          "online",
+        ],
+      },
+      {
+        id: 3,
         Url: "https://www.yahoo.com",
         title: "Yahoo",
         description:
           "News, email and search are just the beginning. Discover more every day. Find your yodel.",
+        highlights: [
+          "News",
+          "email",
+          "search",
+          "beginning",
+          "Discover",
+          "yodel",
+        ],
       },
     ],
   };
