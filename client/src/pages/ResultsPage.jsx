@@ -35,12 +35,12 @@ const ResultsPage = function () {
                   {result.title}
                 </p>
                 <p className="text-sky-700 text-sm">{result.Url}</p>
-                <HighlightText
-                  text={result.description}
-                  highlights={result.highlights}
-                  className="text-zinc-500 text-sm"
-                />
               </a>
+              <HighlightText
+                text={result.description}
+                highlights={result.highlights}
+                className="text-zinc-500 text-sm mt-1"
+              />
             </li>
           ))}
         </ul>
