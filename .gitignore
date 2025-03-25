@@ -30,7 +30,6 @@ out/
 *.ipr
 *.iws
 .settings/
-bin/
 tmp/
 .metadata
 .classpath
@@ -43,7 +42,6 @@ local.properties
 .loadpath
 .factorypath
 nbproject/private/
-build/
 nbbuild/
 dist/
 nbdist/
@@ -54,3 +52,18 @@ nb-configuration.xml
 .DS_Store
 *.log
 data/database.sqlite
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+node_modules
+dist
+dist-ssr
+*.local
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
