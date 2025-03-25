@@ -12,12 +12,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@Transactional
+@Rollback
 class DatabaseHelperTests {
+
   @Autowired private JdbcTemplate jdbcTemplate;
 
-  private DatabaseHelper databaseHelper;
+  @Autowired private DatabaseHelper databaseHelper;
 
   private static final String TEST_URL_PREFIX = "https://test-";
   private static final String TEST_TITLE = "Test Title";
@@ -26,8 +31,6 @@ class DatabaseHelperTests {
 
   @BeforeEach
   void setUp() {
-    databaseHelper = new DatabaseHelper(jdbcTemplate);
-
     jdbcTemplate.update("DELETE FROM documents WHERE url LIKE ?", TEST_URL_PREFIX + "%");
   }
 
