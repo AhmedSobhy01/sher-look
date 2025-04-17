@@ -1,0 +1,114 @@
+package com.sherlook.search.crawler;
+
+import com.sherlook.search.utils.DatabaseHelper;
+import com.sherlook.search.utils.UrlNormalizer;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+
+public class CrawlTask implements Runnable {
+  BlockingQueue<String> urlQueue;
+  private int maxPages;
+  private DatabaseHelper databaseHelper;
+  private HtmlSaver htmlSaver;
+
+  public CrawlTask(
+      BlockingQueue<String> urlQueue,
+      int maxPages,
+      DatabaseHelper databaseHelper,
+      HtmlSaver htmlSaver) {
+    this.urlQueue = urlQueue;
+    this.maxPages = maxPages;
+    this.databaseHelper = databaseHelper;
+    this.htmlSaver = htmlSaver;
+  }
+
+  public void run() {
+    boolean running = true;
+    while (running) {
+      int crawledPages = databaseHelper.getCrawledPagesCount();
+      if (crawledPages >= maxPages) {
+        System.out.println("Max pages crawled. Stopping.");
+        break;
+      }
+      running = crawl();
+    }
+  }
+
+  private boolean crawl() {
+    try {
+      String urlToCrawl = urlQueue.poll(10, TimeUnit.SECONDS);
+      if (urlToCrawl == null) {
+        System.out.println("No URLs to crawl. Exiting.");
+        return false;
+      }
+      // Check if the URL is already crawled
+      urlToCrawl = UrlNormalizer.normalize(urlToCrawl);
+      if (databaseHelper.isUrlCrawled(urlToCrawl)) {
+        System.out.println("URL already crawled: " + urlToCrawl);
+        return true;
+      }
+      System.out.println("Crawling URL: " + urlToCrawl);
+      Connection conn = Jsoup.connect(urlToCrawl);
+      Document doc = conn.get();
+      if (conn.response().statusCode() == 200) {
+        System.out.println("Page title: " + doc.title());
+      } else {
+        System.out.println("Failed to fetch page. Status code: " + conn.response().statusCode());
+      }
+
+      for (Element link : doc.select("a[href]")) {
+        String absUrl = link.absUrl("href");
+        absUrl = UrlNormalizer.normalize(absUrl);
+        if (absUrl != null && UrlNormalizer.isAbsolute(absUrl)) {
+          urlQueue.offer(absUrl);
+        }
+      }
+
+      // save the html page to file system
+      htmlSaver.save(urlToCrawl, doc.html());
+
+      // Save the crawled page to the database
+      String title = doc.title();
+      String description = doc.select("meta[name=description]").attr("content");
+      databaseHelper.insertDocument(
+          urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
+      System.out.println("Saved page to database: " + urlToCrawl);
+      return true;
+
+    } catch (Exception e) {
+      System.err.println("Error: " + e.getMessage());
+      return false;
+    }
+  }
+
+  // private void processRobots(String robotsContent) {
+  // String[] lines = robotsContent.split("\n");
+
+  // String userAgent = null;
+
+  // for (String line : lines) {
+  // line = line.trim();
+
+  // // Ignore empty lines or comments
+  // if (line.isEmpty() || line.startsWith("#")) {
+  // continue;
+  // }
+
+  // // Process the "User-agent" and "Disallow" or "Allow" rules
+  // if (line.startsWith("User-agent:")) {
+  // userAgent = line.substring(11).trim();
+  // System.out.println("User-agent: " + userAgent);
+  // } else if (line.startsWith("Disallow:") && userAgent != null) {
+  // String disallowedPath = line.substring(9).trim();
+  // System.out.println("Disallowed path: " + disallowedPath);
+  // } else if (line.startsWith("Allow:") && userAgent != null) {
+  // String allowedPath = line.substring(6).trim();
+  // System.out.println("Allowed path: " + allowedPath);
+  // }
+  // }
+  // }
+}
