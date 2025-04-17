@@ -5,6 +5,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import javax.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,15 +26,20 @@ public class Crawler {
   BlockingQueue<String> urlQueue = new LinkedBlockingQueue<String>();
 
   private final DatabaseHelper databaseHelper;
-  private final HtmlSaver htmlSaver;
+  private HtmlSaver htmlSaver;
 
   public Crawler(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
+  }
 
+  @PostConstruct
+  public void init() {
     try {
-      this.htmlSaver = new HtmlSaver("htmls");
+      this.htmlSaver = new HtmlSaver(saveDirPath);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create HtmlSaver", e);
+      System.err.println("Failed to create HtmlSaver: " + e.getMessage());
+      System.out.println(saveDirPath);
+      this.htmlSaver = null;
     }
   }
 
