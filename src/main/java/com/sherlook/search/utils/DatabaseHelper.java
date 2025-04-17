@@ -97,4 +97,17 @@ public class DatabaseHelper {
     String sql = "UPDATE documents SET title = ?, description = ? WHERE id = ?";
     jdbcTemplate.update(sql, title, description, documentId);
   }
+
+  public int getCrawledPagesCount() {
+    String sql = "SELECT COUNT(*) FROM documents";
+    Integer result = jdbcTemplate.queryForObject(sql, Integer.class);
+    return result != null ? result : 0;
+  }
+
+  public boolean isUrlCrawled(String url) {
+    String sql = "SELECT COUNT(*) FROM documents WHERE url = ?";
+    Integer count = jdbcTemplate.queryForObject(sql, Integer.class, url);
+    return count != null && count > 0;
+  }
+  
 }
