@@ -1,10 +1,15 @@
 package com.sherlook.search.crawler;
 
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.concurrent.BlockingQueue;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import javax.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -17,19 +22,21 @@ public class Crawler {
   @Value("${crawler.max-pages}")
   private int maxPages;
 
-  @Value("${crawler.start-url}")
-  private String startUrl;
+  @Value("${crawler.start-pages}")
+  private String startPagesPath;
 
   @Value("${crawler.savepath}")
   private String saveDirPath;
 
-  BlockingQueue<String> urlQueue = new LinkedBlockingQueue<String>();
+  private final PersistentQueue urlQueue; // Persistent queue to store URLs
+  private final Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
 
   private final DatabaseHelper databaseHelper;
   private HtmlSaver htmlSaver;
 
-  public Crawler(DatabaseHelper databaseHelper) {
+  public Crawler(DatabaseHelper databaseHelper) throws IOException {
     this.databaseHelper = databaseHelper;
+    urlQueue = new PersistentQueue(new java.io.File("urlQueue.txt"));
   }
 
   @PostConstruct
@@ -46,10 +53,33 @@ public class Crawler {
   public void start() {
     System.out.println("Starting crawler with " + threads + " threads");
     ExecutorService executor = Executors.newFixedThreadPool(threads);
-    urlQueue.add(startUrl);
+
+    Path path = Paths.get("urlQueue.txt");
+    // Check if urlQueue.txt doesnt exisit or doenst contain any URLs
+    boolean isEmpty = false;
+
+    try {
+      isEmpty = Files.notExists(path) || Files.size(path) == 0;
+    } catch (IOException e) {
+      System.err.println("Error checking urlQueue.txt: " + e.getMessage());
+      return;
+    }
+
+    if (isEmpty) {
+      System.out.println("Starting with empty queue. Reading start pages from " + startPagesPath);
+      try (BufferedReader bf = new BufferedReader(new java.io.FileReader(startPagesPath))) {
+        String startUrl;
+        while ((startUrl = bf.readLine()) != null) {
+          urlQueue.offer(startUrl);
+        }
+      } catch (Exception e) {
+        System.err.println("Error reading start pages: " + e.getMessage());
+        return;
+      }
+    }
+
     for (int i = 0; i < threads; i++) {
-      executor.execute(new CrawlTask(urlQueue, maxPages, databaseHelper, htmlSaver));
-      // System.out.println("Thread " + i + " started");
+      executor.execute(new CrawlTask(urlQueue, visitedUrls, maxPages, databaseHelper, htmlSaver));
     }
 
     executor.shutdown();

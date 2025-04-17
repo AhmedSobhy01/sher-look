@@ -2,7 +2,7 @@ package com.sherlook.search.crawler;
 
 import com.sherlook.search.utils.DatabaseHelper;
 import com.sherlook.search.utils.UrlNormalizer;
-import java.util.concurrent.BlockingQueue;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -10,13 +10,15 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 public class CrawlTask implements Runnable {
-  BlockingQueue<String> urlQueue;
+  PersistentQueue urlQueue;
   private int maxPages;
   private DatabaseHelper databaseHelper;
   private HtmlSaver htmlSaver;
+  private Set<String> visitedUrls;
 
   public CrawlTask(
-      BlockingQueue<String> urlQueue,
+      PersistentQueue urlQueue,
+      Set<String> visitedUrls,
       int maxPages,
       DatabaseHelper databaseHelper,
       HtmlSaver htmlSaver) {
@@ -24,6 +26,7 @@ public class CrawlTask implements Runnable {
     this.maxPages = maxPages;
     this.databaseHelper = databaseHelper;
     this.htmlSaver = htmlSaver;
+    this.visitedUrls = visitedUrls;
   }
 
   public void run() {
@@ -49,8 +52,19 @@ public class CrawlTask implements Runnable {
         System.out.println("No URLs to crawl. Exiting.");
         return false;
       }
-      // Check if the URL is already crawled
+
       urlToCrawl = UrlNormalizer.normalize(urlToCrawl);
+      if (urlToCrawl == null) {
+        System.out.println("Invalid URL: " + urlToCrawl);
+        return true;
+      }
+
+      // Check if the URL is already crawled
+      if (!visitedUrls.add(urlToCrawl)) {
+        System.out.println("URL already crawled: " + urlToCrawl);
+        return true;
+      }
+
       if (databaseHelper.isUrlCrawled(urlToCrawl)) {
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
@@ -90,8 +104,12 @@ public class CrawlTask implements Runnable {
       return true;
 
     } catch (Exception e) {
+      if (e instanceof java.net.SocketTimeoutException) {
+        System.out.println("Socket timeout while crawling URL: " + e.getMessage());
+        return true;
+      }
       System.err.println("Error: " + e.getMessage());
-      return false;
+      return true;
     }
   }
 }
