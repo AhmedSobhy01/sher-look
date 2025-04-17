@@ -4,10 +4,32 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class UrlNormalizer {
+
+  private static final Set<String> EXCLUDED_PARAMS;
+
+  static {
+    // Initialize the final HashSet in a static block
+    Set<String> params = new HashSet<>();
+    params.add("ref");
+    params.add("fbclid");
+    params.add("geo_filter");
+    params.add("cId");
+    params.add("iId");
+
+    // Optional: wrap as unmodifiable to prevent accidental modification
+    EXCLUDED_PARAMS = Collections.unmodifiableSet(params);
+  }
+
   public static String normalize(String urlString) {
+
     try {
       URL url = (new URI(urlString)).toURL();
 
@@ -28,8 +50,19 @@ public class UrlNormalizer {
       String query = url.getQuery();
       if (query != null) {
         String[] params = query.split("&");
-        java.util.Arrays.sort(params);
-        query = String.join("&", params);
+        List<String> filtered = new ArrayList<>();
+        for (String param : params) {
+          String key = param.split("=")[0];
+          if (!key.startsWith("utm_") && !EXCLUDED_PARAMS.contains(key)) {
+            filtered.add(param);
+          }
+        }
+        if (!filtered.isEmpty()) {
+          Collections.sort(filtered);
+          query = String.join("&", filtered);
+        } else {
+          query = null;
+        }
       }
 
       String urlStr =
