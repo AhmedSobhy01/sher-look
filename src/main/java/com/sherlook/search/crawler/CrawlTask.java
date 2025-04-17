@@ -85,30 +85,4 @@ public class CrawlTask implements Runnable {
     }
   }
 
-  // private void processRobots(String robotsContent) {
-  // String[] lines = robotsContent.split("\n");
-
-  // String userAgent = null;
-
-  // for (String line : lines) {
-  // line = line.trim();
-
-  // // Ignore empty lines or comments
-  // if (line.isEmpty() || line.startsWith("#")) {
-  // continue;
-  // }
-
-  // // Process the "User-agent" and "Disallow" or "Allow" rules
-  // if (line.startsWith("User-agent:")) {
-  // userAgent = line.substring(11).trim();
-  // System.out.println("User-agent: " + userAgent);
-  // } else if (line.startsWith("Disallow:") && userAgent != null) {
-  // String disallowedPath = line.substring(9).trim();
-  // System.out.println("Disallowed path: " + disallowedPath);
-  // } else if (line.startsWith("Allow:") && userAgent != null) {
-  // String allowedPath = line.substring(6).trim();
-  // System.out.println("Allowed path: " + allowedPath);
-  // }
-  // }
-  // }
 }
