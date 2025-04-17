@@ -28,6 +28,10 @@ public class CrawlTask implements Runnable {
 
   public void run() {
     boolean running = true;
+    if (htmlSaver == null) {
+      System.out.println("HtmlSaver is not initialized. Exiting.");
+      return;
+    }
     while (running) {
       int crawledPages = databaseHelper.getCrawledPagesCount();
       if (crawledPages >= maxPages) {
@@ -51,6 +55,12 @@ public class CrawlTask implements Runnable {
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
+
+      if (!Robots.isAllowed(urlToCrawl)) {
+        System.out.println("Crawling not allowed by robots.txt: " + urlToCrawl);
+        return true;
+      }
+
       System.out.println("Crawling URL: " + urlToCrawl);
       Connection conn = Jsoup.connect(urlToCrawl);
       Document doc = conn.get();
@@ -84,5 +94,4 @@ public class CrawlTask implements Runnable {
       return false;
     }
   }
-
 }
