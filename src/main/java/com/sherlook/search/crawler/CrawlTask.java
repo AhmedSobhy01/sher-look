@@ -1,5 +1,6 @@
 package com.sherlook.search.crawler;
 
+import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.util.Set;
@@ -32,13 +33,15 @@ public class CrawlTask implements Runnable {
   public void run() {
     boolean running = true;
     if (htmlSaver == null) {
-      System.out.println("[CrawlerTask] HtmlSaver is not initialized. Exiting.");
+      ConsoleColors.printError("CrawlerTask");
+      System.err.println("HtmlSaver is not initialized. Exiting.");
       return;
     }
     while (running) {
       int crawledPages = databaseHelper.getCrawledPagesCount();
       if (crawledPages >= maxPages) {
-        System.out.println("[CrawlerTask] Max pages crawled. Stopping.");
+        ConsoleColors.printSuccess("CrawlerTask");
+        System.out.println("Max pages crawled. Stopping.");
         break;
       }
       running = crawl();
@@ -49,40 +52,46 @@ public class CrawlTask implements Runnable {
     try {
       String urlToCrawl = urlQueue.poll(10, TimeUnit.SECONDS);
       if (urlToCrawl == null) {
-        System.out.println("[CrawlerTask] No URLs to crawl. Exiting.");
+        ConsoleColors.printWarning("CrawlerTask");
+        System.out.println("No URLs to crawl. Exiting.");
         return false;
       }
 
       urlToCrawl = UrlNormalizer.normalize(urlToCrawl);
       if (urlToCrawl == null) {
-        System.out.println("[CrawlerTask] Invalid URL: " + urlToCrawl);
+        ConsoleColors.printWarning("CrawlerTask");
+        System.out.println("Invalid URL: " + urlToCrawl);
         return true;
       }
 
       // Check if the URL is already crawled
       if (!visitedUrls.add(urlToCrawl)) {
-        System.out.println("[CrawlerTask] URL already crawled: " + urlToCrawl);
+        ConsoleColors.printInfo("CrawlerTask");
+        System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
       if (databaseHelper.isUrlCrawled(urlToCrawl)) {
-        System.out.println("[CrawlerTask] URL already crawled: " + urlToCrawl);
+        ConsoleColors.printInfo("CrawlerTask");
+        System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
       if (!Robots.isAllowed(urlToCrawl)) {
-        System.out.println("[CrawlerTask] Crawling not allowed by robots.txt: " + urlToCrawl);
+        ConsoleColors.printWarning("CrawlerTask");
+        System.out.println("Crawling not allowed by robots.txt: " + urlToCrawl);
         return true;
       }
 
-      System.out.println("[CrawlerTask] Crawling URL: " + urlToCrawl);
+      ConsoleColors.printInfo("CrawlerTask");
+      System.out.println("Crawling URL: " + urlToCrawl);
       Connection conn = Jsoup.connect(urlToCrawl);
       Document doc = conn.get();
       if (conn.response().statusCode() == 200) {
-        System.out.println("[CrawlerTask] Page title: " + doc.title());
+        ConsoleColors.printSuccess("CrawlerTask");
+        System.out.println("Page title: " + doc.title());
       } else {
-        System.out.println(
-            "[CrawlerTask] Failed to fetch page. Status code: " + conn.response().statusCode());
+        System.out.println("Failed to fetch page. Status code: " + conn.response().statusCode());
       }
 
       for (Element link : doc.select("a[href]")) {
@@ -101,15 +110,18 @@ public class CrawlTask implements Runnable {
       String description = doc.select("meta[name=description]").attr("content");
       databaseHelper.insertDocument(
           urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
-      System.out.println("[CrawlerTask] Saved page to database: " + urlToCrawl);
+      ConsoleColors.printSuccess("CrawlerTask");
+      System.out.println("Saved page to database: " + urlToCrawl);
       return true;
 
     } catch (Exception e) {
       if (e instanceof java.net.SocketTimeoutException) {
-        System.out.println("[CrawlerTask] Socket timeout while crawling URL: " + e.getMessage());
+        ConsoleColors.printWarning("CrawlerTask");
+        System.out.println("Socket timeout while crawling URL: " + e.getMessage());
         return true;
       }
-      System.err.println("[CrawlerTask] Error: " + e.getMessage());
+      ConsoleColors.printError("CrawlerTask");
+      System.err.println("Error: " + e.getMessage());
       return true;
     }
   }

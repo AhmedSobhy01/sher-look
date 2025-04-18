@@ -1,5 +1,6 @@
 package com.sherlook.search.crawler;
 
+import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,6 +41,7 @@ public class Crawler {
     try {
       urlQueue = new PersistentQueue(new File("urlQueue.txt"));
     } catch (IOException e) {
+      ConsoleColors.printError("Crawler");
       System.err.println("Failed to create PersistentQueue: " + e.getMessage());
       throw new RuntimeException("Failed to create PersistentQueue", e);
     }
@@ -50,6 +52,7 @@ public class Crawler {
     try {
       this.htmlSaver = new HtmlSaver(saveDirPath);
     } catch (IOException e) {
+      ConsoleColors.printError("Crawler");
       System.err.println("Failed to create HtmlSaver: " + e.getMessage());
       System.out.println(saveDirPath);
       this.htmlSaver = null;
@@ -57,6 +60,7 @@ public class Crawler {
   }
 
   public void start() {
+    ConsoleColors.printInfo("Crawler");
     System.out.println("Starting crawler with " + threads + " threads");
     ExecutorService executor = Executors.newFixedThreadPool(threads);
 
@@ -67,11 +71,13 @@ public class Crawler {
     try {
       isEmpty = Files.notExists(path) || Files.size(path) == 0;
     } catch (IOException e) {
+      ConsoleColors.printError("Crawler");
       System.err.println("Error checking urlQueue.txt: " + e.getMessage());
       isEmpty = true;
     }
 
     if (isEmpty) {
+      ConsoleColors.printInfo("Crawler");
       System.out.println("Starting with empty queue. Reading start pages from " + startPagesPath);
       try (BufferedReader bf = new BufferedReader(new java.io.FileReader(startPagesPath))) {
         String startUrl;
@@ -79,6 +85,7 @@ public class Crawler {
           urlQueue.offer(startUrl);
         }
       } catch (Exception e) {
+        ConsoleColors.printError("Crawler");
         System.err.println("Error reading start pages: " + e.getMessage());
         return;
       }
@@ -93,6 +100,7 @@ public class Crawler {
       // Wait for all tasks to finish
     }
 
+    ConsoleColors.printSuccess("Crawler");
     System.out.println("All tasks completed");
   }
 }

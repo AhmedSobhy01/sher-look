@@ -1,5 +1,6 @@
 package com.sherlook.search.crawler;
 
+import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +66,8 @@ public class PersistentQueue {
         }
       }
     } catch (IOException e) {
-      System.err.println("[Queue] Error writing to queue file: " + e.getMessage());
+      ConsoleColors.printError("PersistentQueue");
+      System.err.println("Error writing to queue file: " + e.getMessage());
     }
   }
 
