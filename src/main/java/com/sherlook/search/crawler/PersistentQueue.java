@@ -1,5 +1,6 @@
 package com.sherlook.search.crawler;
 
+import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.io.File;
 import java.io.IOException;
@@ -24,13 +25,19 @@ public class PersistentQueue {
     if (queueFile.exists()) {
       try (RandomAccessFile file = new RandomAccessFile(queueFile, "r")) {
         String line;
-        while ((line = file.readLine()) != null) {
+        file.seek(0);
+
+        while (file.getFilePointer() < file.length()) {
+          line = file.readLine();
           if (line != null && !line.startsWith("V_")) {
             line = line.substring(2);
-            line = UrlNormalizer.normalize(line);
-            uncrawledSet.add(line);
-            queue.offer(line);
-            urlPositionMap.put(line, currentPosition);
+            String url = UrlNormalizer.normalize(line);
+            if (url == null) {
+              continue;
+            }
+            uncrawledSet.add(url);
+            queue.offer(url);
+            urlPositionMap.put(url, currentPosition);
           }
           currentPosition = file.getFilePointer();
         }
@@ -65,7 +72,8 @@ public class PersistentQueue {
 
   public String poll(long timeout, TimeUnit unit) throws InterruptedException {
     String url = queue.poll(timeout, unit);
-    if (url == null) return null;
+    if (url == null)
+      return null;
 
     try {
       synchronized (queueFile) {

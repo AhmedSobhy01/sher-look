@@ -2,6 +2,7 @@ package com.sherlook.search.crawler;
 
 import com.sherlook.search.utils.DatabaseHelper;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Io;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -34,16 +36,21 @@ public class Crawler {
   private final DatabaseHelper databaseHelper;
   private HtmlSaver htmlSaver;
 
-  public Crawler(DatabaseHelper databaseHelper) throws IOException {
+  public Crawler(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
-    urlQueue = new PersistentQueue(new java.io.File("urlQueue.txt"));
+    try {
+      urlQueue = new PersistentQueue(new File("urlQueue.txt"));
+    } catch (IOException e) {
+      System.err.println("Failed to create PersistentQueue: " + e.getMessage());
+      throw new RuntimeException("Failed to create PersistentQueue", e);
+    }
   }
 
   @PostConstruct
   public void init() {
     try {
       this.htmlSaver = new HtmlSaver(saveDirPath);
-    } catch (Exception e) {
+    } catch (IOException e) {
       System.err.println("Failed to create HtmlSaver: " + e.getMessage());
       System.out.println(saveDirPath);
       this.htmlSaver = null;
@@ -62,7 +69,7 @@ public class Crawler {
       isEmpty = Files.notExists(path) || Files.size(path) == 0;
     } catch (IOException e) {
       System.err.println("Error checking urlQueue.txt: " + e.getMessage());
-      return;
+      isEmpty = true;
     }
 
     if (isEmpty) {
