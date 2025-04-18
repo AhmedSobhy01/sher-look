@@ -22,13 +22,13 @@ public class Robots {
       String baseUrl = u.getProtocol() + "://" + u.getHost();
 
       if (robotsDisallow.containsKey(baseUrl) || robotsAllow.containsKey(baseUrl)) {
-        System.out.println("Robots.txt already fetched for: " + baseUrl);
+        System.out.println("[Robots] Robots.txt already fetched for: " + baseUrl);
         return;
       }
 
       // Fetch the robots.txt file from baseUrl + "/robots.txt"
       String robotsUrl = baseUrl + "/robots.txt";
-      System.out.println("Fetching robots.txt from: " + robotsUrl);
+      System.out.println("[Robots] Fetching robots.txt from: " + robotsUrl);
       // Use Jsoup or any other library to fetch the robots.txt content
       // For example:
 
@@ -58,22 +58,22 @@ public class Robots {
         robotsDisallow.put(baseUrl, disallowedUrls);
       }
 
-      System.out.println("Fetched robots.txt for: " + baseUrl);
+      System.out.println("[Robots] Fetched robots.txt for: " + baseUrl);
 
     } catch (Exception e) {
       if (e instanceof java.io.FileNotFoundException) {
-        System.out.println("robots.txt not found for: " + url);
+        System.out.println("[Robots] robots.txt not found for: " + url);
       } else {
-        System.out.println("Error fetching robots.txt for: " + url);
+        System.out.println("[Robots] Error fetching robots.txt for: " + url);
       }
       if (e instanceof java.net.UnknownHostException) {
-        System.out.println("Unknown host: " + url);
+        System.out.println("[Robots] Unknown host: " + url);
       } else if (e instanceof java.net.MalformedURLException) {
-        System.out.println("Malformed URL: " + url);
+        System.out.println("[Robots] Malformed URL: " + url);
       } else if (e instanceof java.io.IOException) {
-        System.out.println("I/O error while fetching robots.txt for: " + url);
+        System.out.println("[Robots] I/O error while fetching robots.txt for: " + url);
       } else {
-        System.out.println("Error fetching robots.txt for: " + url);
+        System.out.println("[Robots] Error fetching robots.txt for: " + url);
       }
       e.printStackTrace();
     }
