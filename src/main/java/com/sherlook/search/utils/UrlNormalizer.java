@@ -31,10 +31,18 @@ public class UrlNormalizer {
   public static String normalize(String urlString) {
 
     try {
-      URL url = (new URI(urlString)).toURL();
+      URI uri = new URI(urlString);
+      String scheme = uri.getScheme();
+
+      if (scheme == null
+          || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+        return null; // Reject unsupported schemes like mailto:, ftp:, javascript:, etc.
+      }
+
+      URL url = uri.toURL();
 
       // Lowercase scheme and host
-      String scheme = url.getProtocol().toLowerCase();
+      scheme = url.getProtocol().toLowerCase();
       String host = url.getHost().toLowerCase();
 
       // Remove default port

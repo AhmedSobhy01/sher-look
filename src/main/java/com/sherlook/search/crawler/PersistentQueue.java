@@ -1,6 +1,5 @@
 package com.sherlook.search.crawler;
 
-import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +28,7 @@ public class PersistentQueue {
 
         while (file.getFilePointer() < file.length()) {
           line = file.readLine();
-          if (line != null && !line.startsWith("V_")) {
+          if (line != null && line.startsWith("U_")) {
             line = line.substring(2);
             String url = UrlNormalizer.normalize(line);
             if (url == null) {
