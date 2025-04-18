@@ -109,5 +109,4 @@ public class DatabaseHelper {
     Integer count = jdbcTemplate.queryForObject(sql, Integer.class, url);
     return count != null && count > 0;
   }
-  
 }
