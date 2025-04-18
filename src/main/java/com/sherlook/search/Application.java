@@ -2,7 +2,6 @@ package com.sherlook.search;
 
 import com.sherlook.search.crawler.Crawler;
 import com.sherlook.search.indexer.Indexer;
-import com.sherlook.search.ranker.Ranker;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
@@ -16,16 +15,10 @@ public class Application {
         case "crawl":
           Crawler crawler = context.getBean(Crawler.class);
           crawler.start();
-
           break;
         case "index":
           Indexer indexer = context.getBean(Indexer.class);
           indexer.index();
-
-          break;
-        case "rank":
-          Ranker ranker = context.getBean(Ranker.class);
-          ranker.rankDocuments();
           break;
         case "serve":
           System.out.println("SherLook web server running at http://localhost:8080");
