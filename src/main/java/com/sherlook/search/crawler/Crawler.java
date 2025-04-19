@@ -5,9 +5,6 @@ import com.sherlook.search.utils.DatabaseHelper;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -42,10 +39,7 @@ public class Crawler {
 
   // Constructor for dependency injection
   // This constructor is used for testing purposes
-  public Crawler(
-      DatabaseHelper databaseHelper,
-      PersistentQueue queue,
-      HtmlSaver htmlSaver) {
+  public Crawler(DatabaseHelper databaseHelper, PersistentQueue queue, HtmlSaver htmlSaver) {
     this.databaseHelper = databaseHelper;
     this.urlQueue = queue;
     this.htmlSaver = htmlSaver;

@@ -20,11 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Rollback
 class DatabaseHelperTests {
 
-  @Autowired
-  private JdbcTemplate jdbcTemplate;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
-  @Autowired
-  private DatabaseHelper databaseHelper;
+  @Autowired private DatabaseHelper databaseHelper;
 
   private static final String TEST_URL_PREFIX = "https://test-";
   private static final String TEST_TITLE = "Test Title";
@@ -42,7 +40,8 @@ class DatabaseHelperTests {
 
     databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
 
-    List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT * FROM documents WHERE url = ?", url);
+    List<Map<String, Object>> results =
+        jdbcTemplate.queryForList("SELECT * FROM documents WHERE url = ?", url);
     assertEquals(1, results.size(), "Should insert exactly one document");
 
     Map<String, Object> document = results.get(0);
@@ -59,7 +58,8 @@ class DatabaseHelperTests {
 
     databaseHelper.insertDocument(url, TEST_TITLE, null, TEST_FILE_PATH);
 
-    Map<String, Object> document = jdbcTemplate.queryForMap("SELECT * FROM documents WHERE url = ?", url);
+    Map<String, Object> document =
+        jdbcTemplate.queryForMap("SELECT * FROM documents WHERE url = ?", url);
     assertEquals(TEST_TITLE, document.get("title"));
     assertNull(document.get("description"), "Description should be null");
     assertEquals(TEST_FILE_PATH, document.get("file_path"));
@@ -71,7 +71,8 @@ class DatabaseHelperTests {
 
     databaseHelper.insertDocument(url, null, TEST_DESCRIPTION, TEST_FILE_PATH);
 
-    Map<String, Object> document = jdbcTemplate.queryForMap("SELECT * FROM documents WHERE url = ?", url);
+    Map<String, Object> document =
+        jdbcTemplate.queryForMap("SELECT * FROM documents WHERE url = ?", url);
     assertNull(document.get("title"), "Title should be null");
     assertEquals(TEST_DESCRIPTION, document.get("description"));
   }
@@ -81,16 +82,19 @@ class DatabaseHelperTests {
     String url = TEST_URL_PREFIX + "duplicate";
     databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
 
-    UncategorizedSQLException exception = assertThrows(
-        UncategorizedSQLException.class,
-        () -> databaseHelper.insertDocument(
-            url, "Another Title", "Another Description", TEST_FILE_PATH),
-        "Should throw exception when inserting document with duplicate URL");
+    UncategorizedSQLException exception =
+        assertThrows(
+            UncategorizedSQLException.class,
+            () ->
+                databaseHelper.insertDocument(
+                    url, "Another Title", "Another Description", TEST_FILE_PATH),
+            "Should throw exception when inserting document with duplicate URL");
 
     String exceptionMessage = exception.getMessage().toLowerCase();
-    boolean hasConstraintViolation = exceptionMessage.contains("unique")
-        || exceptionMessage.contains("duplicate")
-        || exceptionMessage.contains("constraint");
+    boolean hasConstraintViolation =
+        exceptionMessage.contains("unique")
+            || exceptionMessage.contains("duplicate")
+            || exceptionMessage.contains("constraint");
 
     assertEquals(true, hasConstraintViolation, "Exception should mention constraint violation");
   }
@@ -117,5 +121,4 @@ class DatabaseHelperTests {
     int count = databaseHelper.getCrawledPagesCount();
     assertEquals(2, count, "Should return the correct number of crawled pages");
   }
-
 }

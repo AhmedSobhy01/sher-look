@@ -81,8 +81,7 @@ public class PersistentQueue {
 
   public String poll(long timeout, TimeUnit unit) throws InterruptedException {
     String url = queue.poll(timeout, unit);
-    if (url == null)
-      return null;
+    if (url == null) return null;
 
     try {
       synchronized (queueFile) {

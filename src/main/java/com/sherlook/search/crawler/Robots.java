@@ -42,7 +42,8 @@ public class Robots {
       if (statusCode == HttpURLConnection.HTTP_OK) {
         List<Pattern> disallowedUrls = new ArrayList<>();
         List<Pattern> allowedUrls = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(connection.getInputStream()));
         String line;
         while ((line = reader.readLine()) != null) {
           if (line.startsWith("Disallow: ")) {
@@ -85,8 +86,7 @@ public class Robots {
       URL u = new URI(url).toURL();
       String baseUrl = u.getProtocol() + "://" + u.getHost();
       String path = u.getPath();
-      if (path == "" || path == null)
-        path = "/";
+      if (path == "" || path == null) path = "/";
 
       if (!robotsDisallow.containsKey(baseUrl) && !robotsAllow.containsKey(baseUrl)) {
         fetchRobots(baseUrl);
