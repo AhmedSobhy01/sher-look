@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -39,12 +40,14 @@ public class Crawler {
 
   // Constructor for dependency injection
   // This constructor is used for testing purposes
+
   public Crawler(DatabaseHelper databaseHelper, PersistentQueue queue, HtmlSaver htmlSaver) {
     this.databaseHelper = databaseHelper;
     this.urlQueue = queue;
     this.htmlSaver = htmlSaver;
   }
 
+  @Autowired
   public Crawler(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
   }
