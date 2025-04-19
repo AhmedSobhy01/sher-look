@@ -102,7 +102,7 @@ public class CrawlTask implements Runnable {
         }
       }
 
-      // save the html page to file system
+      // Save the html page to file system
       htmlSaver.save(urlToCrawl, doc.html());
 
       // Save the crawled page to the database

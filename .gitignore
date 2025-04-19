@@ -67,5 +67,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-urlQueue.txt
-htmls/

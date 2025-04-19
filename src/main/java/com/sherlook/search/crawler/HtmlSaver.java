@@ -33,6 +33,6 @@ public class HtmlSaver {
   private String sha256(String input) throws NoSuchAlgorithmException {
     MessageDigest digest = MessageDigest.getInstance("SHA-256");
     byte[] hash = digest.digest(input.getBytes());
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash); // URL-safe encoding
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
   }
 }

@@ -32,8 +32,6 @@ public class Robots {
       String robotsUrl = baseUrl + "/robots.txt";
       ConsoleColors.printInfo("Robots");
       System.out.println("Fetching robots.txt from: " + robotsUrl);
-      // Use Jsoup or any other library to fetch the robots.txt content
-      // For example:
 
       URL robotsURL = new URI(robotsUrl).toURL();
 
@@ -80,7 +78,6 @@ public class Robots {
       }
 
       System.out.println(", Error: " + e.getMessage());
-      // e.printStackTrace();
     }
   }
 

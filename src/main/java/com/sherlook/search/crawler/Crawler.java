@@ -39,7 +39,7 @@ public class Crawler {
   public Crawler(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
     try {
-      urlQueue = new PersistentQueue(new File("urlQueue.txt"));
+      urlQueue = new PersistentQueue(new File("data/urlQueue.txt"));
     } catch (IOException e) {
       ConsoleColors.printError("Crawler");
       System.err.println("Failed to create PersistentQueue: " + e.getMessage());
@@ -64,8 +64,7 @@ public class Crawler {
     System.out.println("Starting crawler with " + threads + " threads");
     ExecutorService executor = Executors.newFixedThreadPool(threads);
 
-    Path path = Paths.get("urlQueue.txt");
-    // Check if urlQueue.txt doesnt exisit or doenst contain any URLs
+    Path path = Paths.get("data/urlQueue.txt");
     boolean isEmpty = false;
 
     try {
