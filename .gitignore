@@ -67,3 +67,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+data/*
+!data/startpages.txt
