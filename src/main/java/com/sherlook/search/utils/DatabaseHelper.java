@@ -100,6 +100,18 @@ public class DatabaseHelper {
     jdbcTemplate.update(sql, title, description, documentId);
   }
 
+  public int getCrawledPagesCount() {
+    String sql = "SELECT COUNT(*) FROM documents";
+    Integer result = jdbcTemplate.queryForObject(sql, Integer.class);
+    return result != null ? result : 0;
+  }
+
+  public boolean isUrlCrawled(String url) {
+    String sql = "SELECT COUNT(*) FROM documents WHERE url = ?";
+    Integer count = jdbcTemplate.queryForObject(sql, Integer.class, url);
+    return count != null && count > 0;
+  }
+
   /**
    * Computes tf_idf score for documents for a given query
    *
@@ -110,40 +122,40 @@ public class DatabaseHelper {
     // I decided on log10 after some testing
     String sqltemp =
         """
-            WITH tf AS (
-                SELECT
-                    d.url,
-                    d.title,
-                    dw.document_id AS docId,
-                    w.word,
-                    (CAST((SELECT COUNT(*) FROM document_words dw2 WHERE dw2.document_id = dw.document_id AND dw2.word_id = dw.word_id) AS FLOAT) /
-                     (SELECT COUNT(*) FROM document_words dw2 WHERE dw2.document_id = dw.document_id)) AS tf
-                FROM document_words dw
-                JOIN words w ON w.id = dw.word_id
-                JOIN documents d ON d.id = dw.document_id
-                WHERE w.word IN (%s)
-                GROUP BY dw.document_id, w.word, d.url, d.title
-            ),
-            idf AS (
-                SELECT
-                    w.word,
-                    LOG10(
-                        (SELECT COUNT(*) FROM documents) /
-                        ((SELECT COUNT(DISTINCT dw2.document_id) FROM document_words dw2 WHERE dw2.word_id = w.id) + 0.0001)
-                    ) AS idf
-                FROM words w
-                WHERE w.word IN (%s)
-            )
+        WITH tf AS (
             SELECT
-                SUM(tf.tf * idf.idf) AS tf_idf,
-                tf.docId AS document_id,
-                tf.url,
-                tf.title
-            FROM tf
-            JOIN idf ON tf.word = idf.word
-            GROUP BY tf.docId, tf.url, tf.title
-            ORDER BY tf_idf DESC
-            """;
+                d.url,
+                d.title,
+                dw.document_id AS docId,
+                w.word,
+                (CAST((SELECT COUNT(*) FROM document_words dw2 WHERE dw2.document_id = dw.document_id AND dw2.word_id = dw.word_id) AS FLOAT) /
+                 (SELECT COUNT(*) FROM document_words dw2 WHERE dw2.document_id = dw.document_id)) AS tf
+            FROM document_words dw
+            JOIN words w ON w.id = dw.word_id
+            JOIN documents d ON d.id = dw.document_id
+            WHERE w.word IN (%s)
+            GROUP BY dw.document_id, w.word, d.url, d.title
+        ),
+        idf AS (
+            SELECT
+                w.word,
+                LOG10(
+                    (SELECT COUNT(*) FROM documents) /
+                    ((SELECT COUNT(DISTINCT dw2.document_id) FROM document_words dw2 WHERE dw2.word_id = w.id) + 0.0001)
+                ) AS idf
+            FROM words w
+            WHERE w.word IN (%s)
+        )
+        SELECT
+            SUM(tf.tf * idf.idf) AS tf_idf,
+            tf.docId AS document_id,
+            tf.url,
+            tf.title
+        FROM tf
+        JOIN idf ON tf.word = idf.word
+        GROUP BY tf.docId, tf.url, tf.title
+        ORDER BY tf_idf DESC
+        """;
     String quotedQueries =
         String.join(",", queries.stream().map(q -> "'" + q + "'").collect(Collectors.joining(",")));
     String sql = String.format(sqltemp, quotedQueries, quotedQueries);

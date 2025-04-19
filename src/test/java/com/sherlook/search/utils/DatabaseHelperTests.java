@@ -98,4 +98,27 @@ class DatabaseHelperTests {
 
     assertEquals(true, hasConstraintViolation, "Exception should mention constraint violation");
   }
+
+  @Test
+  void testCheckURLCrawled() {
+    String url = TEST_URL_PREFIX + "check-crawled";
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+
+    boolean isCrawled = databaseHelper.isUrlCrawled(url);
+    assertEquals(true, isCrawled, "URL should be marked as crawled");
+
+    isCrawled = databaseHelper.isUrlCrawled("https://not-crawled-url.com");
+    assertEquals(false, isCrawled, "URL should not be marked as crawled");
+  }
+
+  @Test
+  void testGetCrawledPagesCount() {
+    String url1 = TEST_URL_PREFIX + "count-1";
+    String url2 = TEST_URL_PREFIX + "count-2";
+    databaseHelper.insertDocument(url1, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url2, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+
+    int count = databaseHelper.getCrawledPagesCount();
+    assertEquals(2, count, "Should return the correct number of crawled pages");
+  }
 }
