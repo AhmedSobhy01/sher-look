@@ -32,11 +32,6 @@ public class CrawlTask implements Runnable {
 
   public void run() {
     boolean running = true;
-    if (htmlSaver == null) {
-      ConsoleColors.printError("CrawlerTask");
-      System.err.println("HtmlSaver is not initialized. Exiting.");
-      return;
-    }
     while (running) {
       int crawledPages = databaseHelper.getCrawledPagesCount();
       if (crawledPages >= maxPages) {

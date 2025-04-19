@@ -30,32 +30,46 @@ public class Crawler {
   @Value("${crawler.savepath}")
   private String saveDirPath;
 
-  private final PersistentQueue urlQueue; // Persistent queue to store URLs
-  private final Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
+  @Value("${crawler.url-queue-file}")
+  private String urlQueueFilePath;
 
   private final DatabaseHelper databaseHelper;
+
+  private final Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
+
   private HtmlSaver htmlSaver;
+  private PersistentQueue urlQueue; // Persistent queue to store URLs
+
+  // Constructor for dependency injection
+  // This constructor is used for testing purposes
+  public Crawler(
+      DatabaseHelper databaseHelper,
+      PersistentQueue queue,
+      HtmlSaver htmlSaver) {
+    this.databaseHelper = databaseHelper;
+    this.urlQueue = queue;
+    this.htmlSaver = htmlSaver;
+  }
 
   public Crawler(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
-    try {
-      urlQueue = new PersistentQueue(new File("data/urlQueue.txt"));
-    } catch (IOException e) {
-      ConsoleColors.printError("Crawler");
-      System.err.println("Failed to create PersistentQueue: " + e.getMessage());
-      throw new RuntimeException("Failed to create PersistentQueue", e);
-    }
   }
 
   @PostConstruct
   public void init() {
     try {
-      this.htmlSaver = new HtmlSaver(saveDirPath);
+      if (htmlSaver == null) {
+        htmlSaver = new HtmlSaver(saveDirPath);
+      }
+      if (urlQueue == null) {
+        urlQueue = new PersistentQueue(new File(urlQueueFilePath));
+      }
     } catch (IOException e) {
       ConsoleColors.printError("Crawler");
-      System.err.println("Failed to create HtmlSaver: " + e.getMessage());
+      System.err.println("Failed to create Classes: " + e.getMessage());
       System.out.println(saveDirPath);
       this.htmlSaver = null;
+      this.urlQueue = null;
     }
   }
 
@@ -64,17 +78,13 @@ public class Crawler {
     System.out.println("Starting crawler with " + threads + " threads");
     ExecutorService executor = Executors.newFixedThreadPool(threads);
 
-    Path path = Paths.get("data/urlQueue.txt");
-    boolean isEmpty = false;
-
-    try {
-      isEmpty = Files.notExists(path) || Files.size(path) == 0;
-    } catch (IOException e) {
+    if (htmlSaver == null || urlQueue == null) {
       ConsoleColors.printError("Crawler");
-      System.err.println("Error checking urlQueue.txt: " + e.getMessage());
-      isEmpty = true;
+      System.err.println("Crawler not initialized properly. Exiting.");
+      return;
     }
 
+    boolean isEmpty = urlQueue.isIntiallyEmpty();
     if (isEmpty) {
       ConsoleColors.printInfo("Crawler");
       System.out.println("Starting with empty queue. Reading start pages from " + startPagesPath);

@@ -17,12 +17,14 @@ public class PersistentQueue {
   private final Set<String> uncrawledSet = ConcurrentHashMap.newKeySet();
   private final Map<String, Long> urlPositionMap = new ConcurrentHashMap<>();
   private final File queueFile;
+  boolean intiallyEmpty = true;
   private long currentPosition = 0;
 
   public PersistentQueue(File queueFile) throws IOException {
     this.queueFile = queueFile;
 
     if (queueFile.exists()) {
+      intiallyEmpty = false;
       try (RandomAccessFile file = new RandomAccessFile(queueFile, "r")) {
         String line;
         file.seek(0);
@@ -43,8 +45,14 @@ public class PersistentQueue {
         }
       }
     } else {
+      intiallyEmpty = true;
+      queueFile.getParentFile().mkdirs();
       queueFile.createNewFile();
     }
+  }
+
+  public boolean isIntiallyEmpty() {
+    return intiallyEmpty;
   }
 
   public void offer(String url) {
@@ -73,7 +81,8 @@ public class PersistentQueue {
 
   public String poll(long timeout, TimeUnit unit) throws InterruptedException {
     String url = queue.poll(timeout, unit);
-    if (url == null) return null;
+    if (url == null)
+      return null;
 
     try {
       synchronized (queueFile) {
