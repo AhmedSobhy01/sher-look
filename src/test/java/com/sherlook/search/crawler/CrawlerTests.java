@@ -15,7 +15,8 @@ class CrawlerTests {
   private DatabaseHelper mockDatabase;
   private Crawler crawler;
 
-  @TempDir Path tempDir;
+  @TempDir
+  Path tempDir;
 
   @BeforeEach
   void setUp() {
@@ -48,7 +49,7 @@ class CrawlerTests {
     // Don't test real multithreading behavior — let thread execute no-op
     crawler.start();
 
-    // ✅ Verify that both URLs were queued
+    // Verify that both URLs were queued
     verify(mockQueue).offer(new UrlDepthPair("http://example.com", 0));
     verify(mockQueue).offer(new UrlDepthPair("http://example.org", 0));
   }
@@ -66,7 +67,7 @@ class CrawlerTests {
 
     crawler.start();
 
-    // ✅ No interactions with file reading
+    // No interactions with file reading
     verify(mockQueue, never()).offer(any(UrlDepthPair.class));
   }
 
