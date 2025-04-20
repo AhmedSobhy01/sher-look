@@ -23,33 +23,45 @@ public class DatabaseHelper {
     this.jdbcTemplate.setDataSource(jdbcTemplate.getDataSource());
   }
 
-  public void insertDocument(String url, String title, String description, String filePath) {
-    String sql =
-        "INSERT INTO documents (url, title, description, file_path, crawl_time) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)";
-    jdbcTemplate.update(sql, url, title, description, filePath);
+  public int insertDocument(String url, String title, String description, String filePath) {
+    String sql = """
+        INSERT INTO documents (url, title, description, file_path, crawl_time)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        RETURNING id
+        """;
+    return jdbcTemplate.queryForObject(sql, Integer.class, url, title, description, filePath);
+  }
+
+  public void insertLinks(int documentId, List<String> links) {
+    String sql = "INSERT INTO links (document_id, link) VALUES (?, ?)";
+    jdbcTemplate.batchUpdate(sql,
+        links,
+        links.size(),
+        (ps, link) -> {
+          ps.setInt(1, documentId);
+          ps.setString(2, link);
+        });
   }
 
   public List<DocumentWord> getDocumentWords() {
-    String sql =
-        "SELECT d.id AS document_id, d.url, d.title, d.description, d.file_path, d.crawl_time, "
-            + "w.id AS word_id, w.word, dw.position "
-            + "FROM documents d "
-            + "JOIN document_words dw ON d.id = dw.document_id "
-            + "JOIN words w ON dw.word_id = w.id "
-            + "ORDER BY d.id, dw.position";
+    String sql = "SELECT d.id AS document_id, d.url, d.title, d.description, d.file_path, d.crawl_time, "
+        + "w.id AS word_id, w.word, dw.position "
+        + "FROM documents d "
+        + "JOIN document_words dw ON d.id = dw.document_id "
+        + "JOIN words w ON dw.word_id = w.id "
+        + "ORDER BY d.id, dw.position";
 
     return jdbcTemplate.query(
         sql,
         (rs, rowNum) -> {
           Word word = new Word(rs.getInt("word_id"), rs.getString("word"));
-          Document document =
-              new Document(
-                  rs.getInt("document_id"),
-                  rs.getString("url"),
-                  rs.getString("title"),
-                  rs.getString("description"),
-                  rs.getString("file_path"),
-                  rs.getTimestamp("crawl_time"));
+          Document document = new Document(
+              rs.getInt("document_id"),
+              rs.getString("url"),
+              rs.getString("title"),
+              rs.getString("description"),
+              rs.getString("file_path"),
+              rs.getTimestamp("crawl_time"));
 
           return new DocumentWord(document, word, rs.getInt("position"));
         });
@@ -70,14 +82,13 @@ public class DatabaseHelper {
 
     return jdbcTemplate.query(
         sql,
-        (rs, rowNum) ->
-            new Document(
-                rs.getInt("id"),
-                rs.getString("url"),
-                rs.getString("title"),
-                rs.getString("description"),
-                rs.getString("file_path"),
-                rs.getTimestamp("crawl_time")));
+        (rs, rowNum) -> new Document(
+            rs.getInt("id"),
+            rs.getString("url"),
+            rs.getString("title"),
+            rs.getString("description"),
+            rs.getString("file_path"),
+            rs.getTimestamp("crawl_time")));
   }
 
   public void insertDocumentWord(int documentId, String word, int position) {
@@ -120,8 +131,7 @@ public class DatabaseHelper {
    */
   public List<RankedDocument> getDocumentRelevance(List<String> queries) {
     // I decided on log10 after some testing
-    String sqltemp =
-        """
+    String sqltemp = """
         WITH tf AS (
             SELECT
                 d.url,
@@ -156,16 +166,14 @@ public class DatabaseHelper {
         GROUP BY tf.docId, tf.url, tf.title
         ORDER BY tf_idf DESC
         """;
-    String quotedQueries =
-        String.join(",", queries.stream().map(q -> "'" + q + "'").collect(Collectors.joining(",")));
+    String quotedQueries = String.join(",", queries.stream().map(q -> "'" + q + "'").collect(Collectors.joining(",")));
     String sql = String.format(sqltemp, quotedQueries, quotedQueries);
     return jdbcTemplate.query(
         sql,
-        (rs, rowNum) ->
-            new RankedDocument(
-                rs.getInt("document_id"),
-                rs.getString("url"),
-                rs.getString("title"),
-                rs.getDouble("tf_idf")));
+        (rs, rowNum) -> new RankedDocument(
+            rs.getInt("document_id"),
+            rs.getString("url"),
+            rs.getString("title"),
+            rs.getDouble("tf_idf")));
   }
 }

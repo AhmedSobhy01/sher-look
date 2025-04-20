@@ -9,6 +9,8 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CrawlTask implements Runnable {
   PersistentQueue urlQueue;
@@ -95,11 +97,14 @@ public class CrawlTask implements Runnable {
         System.out.println("Failed to fetch page. Status code: " + conn.response().statusCode());
       }
 
+      List<String> links = new ArrayList<>();
+
       for (Element link : doc.select("a[href]")) {
         String absUrl = link.absUrl("href");
         absUrl = UrlNormalizer.normalize(absUrl);
         if (absUrl != null && UrlNormalizer.isAbsolute(absUrl) && urlToCrawlPair.getDepth() < maxDepth) {
           urlQueue.offer(new UrlDepthPair(absUrl, urlToCrawlPair.getDepth() + 1));
+          links.add(absUrl);
         }
       }
 
@@ -109,8 +114,11 @@ public class CrawlTask implements Runnable {
       // Save the crawled page to the database
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
-      databaseHelper.insertDocument(
-          urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
+      int documentId = databaseHelper.insertDocument(urlToCrawl, title, description,
+          htmlSaver.getFilePath(urlToCrawl).toString());
+
+      databaseHelper.insertLinks(documentId, links);
+
       ConsoleColors.printSuccess("CrawlerTask");
       System.out.println("Saved page to database: " + urlToCrawl);
       return true;
