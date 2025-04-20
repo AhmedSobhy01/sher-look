@@ -16,18 +16,20 @@ public class CrawlTask implements Runnable {
   private DatabaseHelper databaseHelper;
   private HtmlSaver htmlSaver;
   private Set<String> visitedUrls;
+  private final int maxDepth;
 
   public CrawlTask(
       PersistentQueue urlQueue,
       Set<String> visitedUrls,
       int maxPages,
       DatabaseHelper databaseHelper,
-      HtmlSaver htmlSaver) {
+      HtmlSaver htmlSaver, int maxDepth) {
     this.urlQueue = urlQueue;
     this.maxPages = maxPages;
     this.databaseHelper = databaseHelper;
     this.htmlSaver = htmlSaver;
     this.visitedUrls = visitedUrls;
+    this.maxDepth = maxDepth;
   }
 
   public void run() {
@@ -45,12 +47,16 @@ public class CrawlTask implements Runnable {
 
   private boolean crawl() {
     try {
-      String urlToCrawl = urlQueue.poll(10, TimeUnit.SECONDS);
-      if (urlToCrawl == null) {
+      UrlDepthPair urlToCrawlPair = urlQueue.poll(10, TimeUnit.SECONDS);
+      if (urlToCrawlPair == null) {
         ConsoleColors.printWarning("CrawlerTask");
         System.out.println("No URLs to crawl. Exiting.");
         return false;
       }
+
+      // Normalize the URL
+      String url = urlToCrawlPair.getUrl();
+      String urlToCrawl = UrlNormalizer.normalize(url);
 
       urlToCrawl = UrlNormalizer.normalize(urlToCrawl);
       if (urlToCrawl == null) {
@@ -92,8 +98,8 @@ public class CrawlTask implements Runnable {
       for (Element link : doc.select("a[href]")) {
         String absUrl = link.absUrl("href");
         absUrl = UrlNormalizer.normalize(absUrl);
-        if (absUrl != null && UrlNormalizer.isAbsolute(absUrl)) {
-          urlQueue.offer(absUrl);
+        if (absUrl != null && UrlNormalizer.isAbsolute(absUrl) && urlToCrawlPair.getDepth() < maxDepth) {
+          urlQueue.offer(new UrlDepthPair(absUrl, urlToCrawlPair.getDepth() + 1));
         }
       }
 
