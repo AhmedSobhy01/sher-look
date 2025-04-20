@@ -123,16 +123,8 @@ public class CrawlTask implements Runnable {
       // Save the crawled page to the database
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
-
       List<String> uniqueChildrens = links.stream().distinct().toList();
-
-      if (uniqueChildrens.size() != links.size()) {
-        ConsoleColors.printError(crawlTaskString);
-        System.out.println("Duplicate links found. Saving unique links only.");
-      }
-
       saveDocumentWithLinks(urlToCrawl, title, description, uniqueChildrens);
-
       ConsoleColors.printSuccess(crawlTaskString);
       System.out.println("Saved page to database: " + urlToCrawl);
 
