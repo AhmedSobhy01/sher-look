@@ -44,7 +44,7 @@ public class CrawlTask implements Runnable {
     while (running) {
       int crawledPages = databaseHelper.getCrawledPagesCount();
       if (crawledPages >= maxPages) {
-        ConsoleColors.printSuccess("CrawlerTask");
+        ConsoleColors.printSuccess("CrawlerTask " + threadId);
         System.out.println("Max pages crawled. Stopping.");
         break;
       }
@@ -141,6 +141,10 @@ public class CrawlTask implements Runnable {
       if (e instanceof java.net.SocketTimeoutException) {
         ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Socket timeout while crawling URL: " + e.getMessage());
+        return true;
+      } else if (e instanceof org.jsoup.UnsupportedMimeTypeException) {
+        ConsoleColors.printWarning(crawlTaskString);
+        System.out.println("Unsupported MIME type while crawling URL: " + e.getMessage());
         return true;
       }
       ConsoleColors.printError(crawlTaskString);
