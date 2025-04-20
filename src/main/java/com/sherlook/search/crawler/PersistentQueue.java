@@ -29,6 +29,9 @@ public class PersistentQueue {
         String line;
         file.seek(0);
 
+        ConsoleColors.printInfo("PersistentQueue");
+        System.out.println("Loading queue from file: " + queueFile.getAbsolutePath());
+
         while (file.getFilePointer() < file.length()) {
           line = file.readLine();
           if (line != null && line.startsWith("U_")) {
@@ -57,7 +60,15 @@ public class PersistentQueue {
           currentPosition = file.getFilePointer();
         }
       }
+
+      ConsoleColors.printInfo("PersistentQueue");
+      System.out.println("Queue loaded successfully. Size: " + queue.size());
+      ConsoleColors.printInfo("PersistentQueue");
+      System.out.println("Visited URLs loaded successfully. Size: " + visitedUrlsSet.size());
     } else {
+      ConsoleColors.printInfo("PersistentQueue");
+      System.out.println(
+          "Queue file does not exist. Creating a new one: " + queueFile.getAbsolutePath());
       intiallyEmpty = true;
       queueFile.getParentFile().mkdirs();
       queueFile.createNewFile();
@@ -70,7 +81,8 @@ public class PersistentQueue {
 
   public boolean offer(UrlDepthPair urlDepthPair) {
     try {
-      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair)) return false;
+      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair))
+        return false;
 
       String urlString = urlDepthPair.getUrl();
       urlString = UrlNormalizer.normalize(urlString);
@@ -100,7 +112,8 @@ public class PersistentQueue {
 
   public UrlDepthPair poll(long timeout, TimeUnit unit) throws InterruptedException {
     UrlDepthPair urlDepthPair = queue.poll(timeout, unit);
-    if (urlDepthPair == null) return null;
+    if (urlDepthPair == null)
+      return null;
 
     try {
       synchronized (queueFile) {
