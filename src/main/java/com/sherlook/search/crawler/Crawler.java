@@ -105,7 +105,8 @@ public class Crawler {
     }
 
     for (int i = 0; i < threads; i++) {
-      executor.execute(new CrawlTask(urlQueue, visitedUrls, maxPages, databaseHelper, htmlSaver, maxDepth));
+      executor.execute(
+          new CrawlTask(urlQueue, visitedUrls, maxPages, databaseHelper, htmlSaver, maxDepth));
     }
 
     executor.shutdown();

@@ -3,14 +3,14 @@ package com.sherlook.search.crawler;
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import com.sherlook.search.utils.UrlNormalizer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import java.util.ArrayList;
-import java.util.List;
 
 public class CrawlTask implements Runnable {
   PersistentQueue urlQueue;
@@ -25,7 +25,8 @@ public class CrawlTask implements Runnable {
       Set<String> visitedUrls,
       int maxPages,
       DatabaseHelper databaseHelper,
-      HtmlSaver htmlSaver, int maxDepth) {
+      HtmlSaver htmlSaver,
+      int maxDepth) {
     this.urlQueue = urlQueue;
     this.maxPages = maxPages;
     this.databaseHelper = databaseHelper;
@@ -102,7 +103,9 @@ public class CrawlTask implements Runnable {
       for (Element link : doc.select("a[href]")) {
         String absUrl = link.absUrl("href");
         absUrl = UrlNormalizer.normalize(absUrl);
-        if (absUrl != null && UrlNormalizer.isAbsolute(absUrl) && urlToCrawlPair.getDepth() < maxDepth) {
+        if (absUrl != null
+            && UrlNormalizer.isAbsolute(absUrl)
+            && urlToCrawlPair.getDepth() < maxDepth) {
           urlQueue.offer(new UrlDepthPair(absUrl, urlToCrawlPair.getDepth() + 1));
           links.add(absUrl);
         }
@@ -114,8 +117,9 @@ public class CrawlTask implements Runnable {
       // Save the crawled page to the database
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
-      int documentId = databaseHelper.insertDocument(urlToCrawl, title, description,
-          htmlSaver.getFilePath(urlToCrawl).toString());
+      int documentId =
+          databaseHelper.insertDocument(
+              urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
 
       databaseHelper.insertLinks(documentId, links);
 
