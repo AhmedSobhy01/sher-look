@@ -36,9 +36,12 @@ public class PersistentQueue {
           line = file.readLine();
           if (line != null && line.startsWith("U_")) {
             line = line.substring(2);
-            String[] parts = line.split(" ");
-            String url = UrlNormalizer.normalize(parts[0]);
-            int depth = Integer.parseInt(parts[1]);
+            int index = line.lastIndexOf(" ");
+            if (index == -1) {
+              continue;
+            }
+            String url = UrlNormalizer.normalize(line.substring(0, index));
+            int depth = Integer.parseInt(line.substring(index + 1));
             if (url == null) {
               continue;
             }
@@ -48,9 +51,12 @@ public class PersistentQueue {
             urlPositionMap.put(urlDepthPair, currentPosition);
           } else if (line != null && line.startsWith("V_")) {
             line = line.substring(2);
-            String[] parts = line.split(" ");
-            String url = UrlNormalizer.normalize(parts[0]);
-            int depth = Integer.parseInt(parts[1]);
+            int index = line.lastIndexOf(" ");
+            if (index == -1) {
+              continue;
+            }
+            String url = UrlNormalizer.normalize(line.substring(0, index));
+            int depth = Integer.parseInt(line.substring(index + 1));
             if (url == null) {
               continue;
             }
