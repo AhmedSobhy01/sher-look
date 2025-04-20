@@ -13,9 +13,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class PersistentQueue {
-  private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
-  private final Set<String> uncrawledSet = ConcurrentHashMap.newKeySet();
-  private final Map<String, Long> urlPositionMap = new ConcurrentHashMap<>();
+  private final BlockingQueue<UrlDepthPair> queue = new LinkedBlockingQueue<>();
+  private final Set<UrlDepthPair> uncrawledSet = ConcurrentHashMap.newKeySet();
+  private final Map<UrlDepthPair, Long> urlPositionMap = new ConcurrentHashMap<>();
   private final File queueFile;
   boolean intiallyEmpty = true;
   private long currentPosition = 0;
@@ -33,13 +33,16 @@ public class PersistentQueue {
           line = file.readLine();
           if (line != null && line.startsWith("U_")) {
             line = line.substring(2);
+            String[] parts = line.split(" ");
             String url = UrlNormalizer.normalize(line);
+            int depth = Integer.parseInt(parts[1]);
             if (url == null) {
               continue;
             }
-            uncrawledSet.add(url);
-            queue.offer(url);
-            urlPositionMap.put(url, currentPosition);
+            UrlDepthPair urlDepthPair = new UrlDepthPair(url, depth);
+            uncrawledSet.add(urlDepthPair);
+            queue.offer(urlDepthPair);
+            urlPositionMap.put(urlDepthPair, currentPosition);
           }
           currentPosition = file.getFilePointer();
         }
@@ -55,10 +58,11 @@ public class PersistentQueue {
     return intiallyEmpty;
   }
 
-  public void offer(String url) {
+  public void offer(UrlDepthPair url) {
     try {
       if (url != null) {
-        url = UrlNormalizer.normalize(url);
+        String urlString = url.getUrl();
+        urlString = UrlNormalizer.normalize(urlString);
         if (url == null || uncrawledSet.contains(url)) {
           return;
         }
@@ -66,7 +70,7 @@ public class PersistentQueue {
           try (RandomAccessFile file = new RandomAccessFile(queueFile, "rw")) {
             file.seek(currentPosition);
             urlPositionMap.put(url, currentPosition);
-            file.writeBytes("U_" + url + "\n");
+            file.writeBytes("U_" + url.getUrl() + " " + url.getDepth() + "\n");
             currentPosition = file.getFilePointer();
             queue.offer(url);
             uncrawledSet.add(url);
@@ -79,21 +83,22 @@ public class PersistentQueue {
     }
   }
 
-  public String poll(long timeout, TimeUnit unit) throws InterruptedException {
-    String url = queue.poll(timeout, unit);
-    if (url == null) return null;
+  public UrlDepthPair poll(long timeout, TimeUnit unit) throws InterruptedException {
+    UrlDepthPair urlDepthPair = queue.poll(timeout, unit);
+    if (urlDepthPair == null)
+      return null;
 
     try {
       synchronized (queueFile) {
         try (RandomAccessFile file = new RandomAccessFile(queueFile, "rw")) {
-          file.seek(urlPositionMap.get(url));
-          file.writeBytes("V_" + url + "\n");
-          uncrawledSet.remove(url);
+          file.seek(urlPositionMap.get(urlDepthPair));
+          file.writeBytes("V_" + urlDepthPair.getUrl() + " " + urlDepthPair.getDepth() + "\n");
+          uncrawledSet.remove(urlDepthPair);
         }
       }
     } catch (IOException e) {
       System.err.println("[Queue] Error writing to queue file: " + e.getMessage());
     }
-    return url;
+    return urlDepthPair;
   }
 }
