@@ -23,18 +23,18 @@ public class DatabaseHelper {
     this.jdbcTemplate.setDataSource(jdbcTemplate.getDataSource());
   }
 
-  public int insertDocument(String url, String title, String description, String filePath) {
+  public void insertDocument(String url, String title, String description, String filePath) {
     String sql =
         """
         INSERT INTO documents (url, title, description, file_path, crawl_time)
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         RETURNING id
         """;
-    return jdbcTemplate.queryForObject(sql, Integer.class, url, title, description, filePath);
+    jdbcTemplate.update(sql, Integer.class, url, title, description, filePath);
   }
 
   public void insertLinks(int documentId, List<String> links) {
-    String sql = "INSERT INTO links (document_id, link) VALUES (?, ?)";
+    String sql = "INSERT INTO links (source_document_id, target_url) VALUES (?, ?)";
     jdbcTemplate.batchUpdate(
         sql,
         links,
@@ -43,6 +43,17 @@ public class DatabaseHelper {
           ps.setInt(1, documentId);
           ps.setString(2, link);
         });
+  }
+
+  public int getDocumentId(String url) {
+    String sql = "SELECT id FROM documents WHERE url = ?";
+    Integer documentId;
+    try {
+      documentId = jdbcTemplate.queryForObject(sql, Integer.class, url);
+    } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+      return -1;
+    }
+    return documentId != null ? documentId : -1;
   }
 
   public List<DocumentWord> getDocumentWords() {

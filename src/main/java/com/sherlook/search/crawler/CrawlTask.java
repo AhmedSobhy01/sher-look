@@ -11,6 +11,7 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.springframework.transaction.annotation.Transactional;
 
 public class CrawlTask implements Runnable {
   PersistentQueue urlQueue;
@@ -19,6 +20,7 @@ public class CrawlTask implements Runnable {
   private HtmlSaver htmlSaver;
   private Set<String> visitedUrls;
   private final int maxDepth;
+  private final int threadId;
 
   public CrawlTask(
       PersistentQueue urlQueue,
@@ -26,13 +28,15 @@ public class CrawlTask implements Runnable {
       int maxPages,
       DatabaseHelper databaseHelper,
       HtmlSaver htmlSaver,
-      int maxDepth) {
+      int maxDepth,
+      int threadId) {
     this.urlQueue = urlQueue;
     this.maxPages = maxPages;
     this.databaseHelper = databaseHelper;
     this.htmlSaver = htmlSaver;
     this.visitedUrls = visitedUrls;
     this.maxDepth = maxDepth;
+    this.threadId = threadId;
   }
 
   public void run() {
@@ -44,15 +48,15 @@ public class CrawlTask implements Runnable {
         System.out.println("Max pages crawled. Stopping.");
         break;
       }
-      running = crawl();
+      running = crawl("CrawlerTask " + threadId);
     }
   }
 
-  private boolean crawl() {
+  private boolean crawl(String crawlTaskString) {
     try {
       UrlDepthPair urlToCrawlPair = urlQueue.poll(10, TimeUnit.SECONDS);
       if (urlToCrawlPair == null) {
-        ConsoleColors.printWarning("CrawlerTask");
+        ConsoleColors.printWarning(crawlTaskString);
         System.out.println("No URLs to crawl. Exiting.");
         return false;
       }
@@ -63,36 +67,36 @@ public class CrawlTask implements Runnable {
 
       urlToCrawl = UrlNormalizer.normalize(urlToCrawl);
       if (urlToCrawl == null) {
-        ConsoleColors.printWarning("CrawlerTask");
+        ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Invalid URL: " + urlToCrawl);
         return true;
       }
 
       // Check if the URL is already crawled
       if (!visitedUrls.add(urlToCrawl)) {
-        ConsoleColors.printInfo("CrawlerTask");
+        ConsoleColors.printInfo(crawlTaskString);
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
       if (databaseHelper.isUrlCrawled(urlToCrawl)) {
-        ConsoleColors.printInfo("CrawlerTask");
+        ConsoleColors.printInfo(crawlTaskString);
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
       if (!Robots.isAllowed(urlToCrawl)) {
-        ConsoleColors.printWarning("CrawlerTask");
+        ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Crawling not allowed by robots.txt: " + urlToCrawl);
         return true;
       }
 
-      ConsoleColors.printInfo("CrawlerTask");
+      ConsoleColors.printInfo(crawlTaskString);
       System.out.println("Crawling URL: " + urlToCrawl);
       Connection conn = Jsoup.connect(urlToCrawl);
       Document doc = conn.get();
       if (conn.response().statusCode() == 200) {
-        ConsoleColors.printSuccess("CrawlerTask");
+        ConsoleColors.printSuccess(crawlTaskString);
         System.out.println("Page title: " + doc.title());
       } else {
         System.out.println("Failed to fetch page. Status code: " + conn.response().statusCode());
@@ -106,8 +110,10 @@ public class CrawlTask implements Runnable {
         if (absUrl != null
             && UrlNormalizer.isAbsolute(absUrl)
             && urlToCrawlPair.getDepth() < maxDepth) {
-          urlQueue.offer(new UrlDepthPair(absUrl, urlToCrawlPair.getDepth() + 1));
-          links.add(absUrl);
+          boolean newLink = urlQueue.offer(new UrlDepthPair(absUrl, urlToCrawlPair.getDepth() + 1));
+          if (newLink) {
+            links.add(absUrl);
+          }
         }
       }
 
@@ -117,25 +123,42 @@ public class CrawlTask implements Runnable {
       // Save the crawled page to the database
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
-      int documentId =
-          databaseHelper.insertDocument(
-              urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
 
-      databaseHelper.insertLinks(documentId, links);
+      List<String> uniqueChildrens = links.stream().distinct().toList();
 
-      ConsoleColors.printSuccess("CrawlerTask");
+      if (uniqueChildrens.size() != links.size()) {
+        ConsoleColors.printError(crawlTaskString);
+        System.out.println("Duplicate links found. Saving unique links only.");
+      }
+
+      saveDocumentWithLinks(urlToCrawl, title, description, uniqueChildrens);
+
+      ConsoleColors.printSuccess(crawlTaskString);
       System.out.println("Saved page to database: " + urlToCrawl);
       return true;
 
     } catch (Exception e) {
       if (e instanceof java.net.SocketTimeoutException) {
-        ConsoleColors.printWarning("CrawlerTask");
+        ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Socket timeout while crawling URL: " + e.getMessage());
         return true;
       }
-      ConsoleColors.printError("CrawlerTask");
+      ConsoleColors.printError(crawlTaskString);
       System.err.println("Error: " + e.getMessage());
       return true;
     }
+  }
+
+  @Transactional
+  public void saveDocumentWithLinks(
+      String urlToCrawl, String title, String description, List<String> uniqueChildrens)
+      throws Exception {
+    databaseHelper.insertDocument(
+        urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
+    int documentId = databaseHelper.getDocumentId(urlToCrawl);
+    if (documentId == -1) {
+      throw new Exception("Failed to get document ID for URL: " + urlToCrawl);
+    }
+    databaseHelper.insertLinks(documentId, uniqueChildrens);
   }
 }
