@@ -70,8 +70,7 @@ public class PersistentQueue {
 
   public boolean offer(UrlDepthPair urlDepthPair) {
     try {
-      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair))
-        return false;
+      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair)) return false;
 
       String urlString = urlDepthPair.getUrl();
       urlString = UrlNormalizer.normalize(urlString);
@@ -101,8 +100,7 @@ public class PersistentQueue {
 
   public UrlDepthPair poll(long timeout, TimeUnit unit) throws InterruptedException {
     UrlDepthPair urlDepthPair = queue.poll(timeout, unit);
-    if (urlDepthPair == null)
-      return null;
+    if (urlDepthPair == null) return null;
 
     try {
       synchronized (queueFile) {
