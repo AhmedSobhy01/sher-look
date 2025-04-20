@@ -1,5 +1,6 @@
 package com.sherlook.search.crawler;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.sherlook.search.utils.DatabaseHelper;
@@ -14,7 +15,8 @@ class CrawlerTests {
   private DatabaseHelper mockDatabase;
   private Crawler crawler;
 
-  @TempDir Path tempDir;
+  @TempDir
+  Path tempDir;
 
   @BeforeEach
   void setUp() {
@@ -31,7 +33,7 @@ class CrawlerTests {
     Path queueFile = tempDir.resolve("urlQueue.txt");
 
     // Write fake start URLs
-    Files.writeString(startPagesFile, "http://example.com\nhttp://example.org\n");
+    Files.writeString(startPagesFile, "http://example.com 0\nhttp://example.org 0\n");
 
     // Mock the queue's behavior
     when(mockQueue.isIntiallyEmpty()).thenReturn(true);
@@ -48,8 +50,8 @@ class CrawlerTests {
     crawler.start();
 
     // ✅ Verify that both URLs were queued
-    verify(mockQueue).offer("http://example.com");
-    verify(mockQueue).offer("http://example.org");
+    verify(mockQueue).offer(new UrlDepthPair("http://example.com", 0));
+    verify(mockQueue).offer(new UrlDepthPair("http://example.org", 0));
   }
 
   @Test
@@ -66,7 +68,7 @@ class CrawlerTests {
     crawler.start();
 
     // ✅ No interactions with file reading
-    verify(mockQueue, never()).offer(anyString());
+    verify(mockQueue, never()).offer(any(UrlDepthPair.class));
   }
 
   @Test
