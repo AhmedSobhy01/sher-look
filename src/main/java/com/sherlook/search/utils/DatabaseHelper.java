@@ -28,9 +28,8 @@ public class DatabaseHelper {
         """
         INSERT INTO documents (url, title, description, file_path, crawl_time)
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        RETURNING id
         """;
-    jdbcTemplate.update(sql, Integer.class, url, title, description, filePath);
+    jdbcTemplate.update(sql, url, title, description, filePath);
   }
 
   public void insertLinks(int documentId, List<String> links) {
