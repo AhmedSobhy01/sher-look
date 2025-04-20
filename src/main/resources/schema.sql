@@ -1,3 +1,6 @@
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout = 500;
+
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT UNIQUE,
