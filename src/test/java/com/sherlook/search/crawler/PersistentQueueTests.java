@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Set;
 
 class PersistentQueueTests {
 
@@ -58,7 +58,8 @@ class PersistentQueueTests {
     assertEquals(url, polled);
 
     // Read the file manually to verify "V_" line exists
-    boolean foundVLine = Files.readAllLines(tempFilePath).stream().anyMatch(line -> line.startsWith("V_"));
+    boolean foundVLine =
+        Files.readAllLines(tempFilePath).stream().anyMatch(line -> line.startsWith("V_"));
     assertTrue(foundVLine, "Polled URL should be marked as visited in file");
   }
 
@@ -66,8 +67,8 @@ class PersistentQueueTests {
   void testConstructorLoadsUncrawledUrls() throws Exception {
     Files.writeString(tempFilePath, "U_http://example.com 0\nU_http://second.com 1\n");
 
-    PersistentQueue reloaded = new PersistentQueue(tempFilePath.toFile(),
-        ConcurrentHashMap.newKeySet());
+    PersistentQueue reloaded =
+        new PersistentQueue(tempFilePath.toFile(), ConcurrentHashMap.newKeySet());
     UrlDepthPair first = reloaded.poll(1, TimeUnit.SECONDS);
     UrlDepthPair second = reloaded.poll(1, TimeUnit.SECONDS);
 

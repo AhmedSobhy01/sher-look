@@ -37,10 +37,12 @@ class CrawlTaskTests {
     Set<String> visited = ConcurrentHashMap.newKeySet();
     visited.add("http://example.com");
 
-    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockQueue.poll(10, TimeUnit.SECONDS))
+        .thenReturn(new UrlDepthPair("http://example.com", 0))
+        .thenReturn(null);
     when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(true);
 
-    CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
+    CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5, 0);
     task.run();
 
     verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
@@ -51,13 +53,15 @@ class CrawlTaskTests {
   void testSkipsIfDisallowedByRobots() throws Exception {
     Set<String> visited = ConcurrentHashMap.newKeySet();
 
-    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockQueue.poll(10, TimeUnit.SECONDS))
+        .thenReturn(new UrlDepthPair("http://example.com", 0))
+        .thenReturn(null);
     when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
 
     try (MockedStatic<Robots> robotsMock = mockStatic(Robots.class)) {
       robotsMock.when(() -> Robots.isAllowed("http://example.com")).thenReturn(false);
 
-      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
+      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5, 0);
       task.run();
     }
 
@@ -76,7 +80,9 @@ class CrawlTaskTests {
     when(doc.select("meta[name=description]")).thenReturn(mock(Elements.class));
     when(doc.select("a[href]")).thenReturn(new Elements());
 
-    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockQueue.poll(10, TimeUnit.SECONDS))
+        .thenReturn(new UrlDepthPair("http://example.com", 0))
+        .thenReturn(null);
     when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
     when(mockHtmlSaver.getFilePath("http://example.com")).thenReturn(examplePath);
 
@@ -94,7 +100,7 @@ class CrawlTaskTests {
       when(response.statusCode()).thenReturn(200);
       when(connection.response()).thenReturn(response);
       jsoupMock.when(() -> Jsoup.connect("http://example.com")).thenReturn(connection);
-      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
+      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5, 0);
       task.run();
     }
 
@@ -109,7 +115,9 @@ class CrawlTaskTests {
 
     Set<String> visited = ConcurrentHashMap.newKeySet();
 
-    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockQueue.poll(10, TimeUnit.SECONDS))
+        .thenReturn(new UrlDepthPair("http://example.com", 0))
+        .thenReturn(null);
     when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
 
     org.jsoup.Connection mockConn = mock(org.jsoup.Connection.class);
@@ -122,7 +130,7 @@ class CrawlTaskTests {
 
       jsoupMock.when(() -> Jsoup.connect("http://example.com")).thenReturn(mockConn);
 
-      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
+      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5, 0);
       task.run();
     }
 

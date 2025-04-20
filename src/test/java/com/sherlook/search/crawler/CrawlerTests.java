@@ -15,8 +15,7 @@ class CrawlerTests {
   private DatabaseHelper mockDatabase;
   private Crawler crawler;
 
-  @TempDir
-  Path tempDir;
+  @TempDir Path tempDir;
 
   @BeforeEach
   void setUp() {
