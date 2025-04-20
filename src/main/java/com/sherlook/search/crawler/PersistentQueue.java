@@ -34,7 +34,7 @@ public class PersistentQueue {
           if (line != null && line.startsWith("U_")) {
             line = line.substring(2);
             String[] parts = line.split(" ");
-            String url = UrlNormalizer.normalize(line);
+            String url = UrlNormalizer.normalize(parts[0]);
             int depth = Integer.parseInt(parts[1]);
             if (url == null) {
               continue;
@@ -46,7 +46,7 @@ public class PersistentQueue {
           } else if (line != null && line.startsWith("V_")) {
             line = line.substring(2);
             String[] parts = line.split(" ");
-            String url = UrlNormalizer.normalize(line);
+            String url = UrlNormalizer.normalize(parts[0]);
             int depth = Integer.parseInt(parts[1]);
             if (url == null) {
               continue;
@@ -68,34 +68,41 @@ public class PersistentQueue {
     return intiallyEmpty;
   }
 
-  public void offer(UrlDepthPair url) {
+  public boolean offer(UrlDepthPair urlDepthPair) {
     try {
-      if (url != null) {
-        String urlString = url.getUrl();
-        urlString = UrlNormalizer.normalize(urlString);
-        if (url == null || uncrawledSet.contains(url)) {
-          return;
-        }
-        synchronized (queueFile) {
-          try (RandomAccessFile file = new RandomAccessFile(queueFile, "rw")) {
-            file.seek(currentPosition);
-            urlPositionMap.put(url, currentPosition);
-            file.writeBytes("U_" + url.getUrl() + " " + url.getDepth() + "\n");
-            currentPosition = file.getFilePointer();
-            queue.offer(url);
-            uncrawledSet.add(url);
-          }
+      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair))
+        return false;
+
+      String urlString = urlDepthPair.getUrl();
+      urlString = UrlNormalizer.normalize(urlString);
+      if (urlString == null) {
+        return false;
+      }
+
+      synchronized (queueFile) {
+        try (RandomAccessFile file = new RandomAccessFile(queueFile, "rw")) {
+          file.seek(currentPosition);
+          urlPositionMap.put(urlDepthPair, currentPosition);
+          file.writeBytes("U_" + urlDepthPair.getUrl() + " " + urlDepthPair.getDepth() + "\n");
+          currentPosition = file.getFilePointer();
+          queue.offer(urlDepthPair);
+          uncrawledSet.add(urlDepthPair);
         }
       }
+
+      return true;
+
     } catch (IOException e) {
       ConsoleColors.printError("PersistentQueue");
       System.err.println("Error writing to queue file: " + e.getMessage());
+      return false;
     }
   }
 
   public UrlDepthPair poll(long timeout, TimeUnit unit) throws InterruptedException {
     UrlDepthPair urlDepthPair = queue.poll(timeout, unit);
-    if (urlDepthPair == null) return null;
+    if (urlDepthPair == null)
+      return null;
 
     try {
       synchronized (queueFile) {
