@@ -135,6 +135,9 @@ public class CrawlTask implements Runnable {
 
       ConsoleColors.printSuccess(crawlTaskString);
       System.out.println("Saved page to database: " + urlToCrawl);
+
+      Thread.sleep(1000); // Delay for one second between crawls
+
       return true;
 
     } catch (Exception e) {
@@ -146,6 +149,10 @@ public class CrawlTask implements Runnable {
         ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Unsupported MIME type while crawling URL: " + e.getMessage());
         return true;
+      } else if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt(); // Good practice to reset interrupt flag
+        ConsoleColors.printWarning(crawlTaskString);
+        System.out.println("Sleep interrupted");
       }
       ConsoleColors.printError(crawlTaskString);
       System.err.println("Error: " + e.getMessage());
