@@ -21,15 +21,15 @@ import org.mockito.MockedStatic;
 
 class CrawlTaskTests {
 
-  private PersistentQueue queue;
-  private DatabaseHelper db;
-  private HtmlSaver saver;
+  private PersistentQueue mockQueue;
+  private DatabaseHelper mockDatabase;
+  private HtmlSaver mockHtmlSaver;
 
   @BeforeEach
   void setUp() {
-    queue = mock(PersistentQueue.class);
-    db = mock(DatabaseHelper.class);
-    saver = mock(HtmlSaver.class);
+    mockQueue = mock(PersistentQueue.class);
+    mockDatabase = mock(DatabaseHelper.class);
+    mockHtmlSaver = mock(HtmlSaver.class);
   }
 
   @Test
@@ -37,32 +37,32 @@ class CrawlTaskTests {
     Set<String> visited = ConcurrentHashMap.newKeySet();
     visited.add("http://example.com");
 
-    when(queue.poll(10, TimeUnit.SECONDS)).thenReturn("http://example.com").thenReturn(null);
-    when(db.isUrlCrawled("http://example.com")).thenReturn(true);
+    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(true);
 
-    CrawlTask task = new CrawlTask(queue, visited, 5, db, saver);
+    CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
     task.run();
 
-    verify(db, never()).insertDocument(any(), any(), any(), any());
-    verify(saver, never()).save(any(), any());
+    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
+    verify(mockHtmlSaver, never()).save(any(), any());
   }
 
   @Test
   void testSkipsIfDisallowedByRobots() throws Exception {
     Set<String> visited = ConcurrentHashMap.newKeySet();
 
-    when(queue.poll(10, TimeUnit.SECONDS)).thenReturn("http://example.com").thenReturn(null);
-    when(db.isUrlCrawled("http://example.com")).thenReturn(false);
+    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
 
     try (MockedStatic<Robots> robotsMock = mockStatic(Robots.class)) {
       robotsMock.when(() -> Robots.isAllowed("http://example.com")).thenReturn(false);
 
-      CrawlTask task = new CrawlTask(queue, visited, 5, db, saver);
+      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
       task.run();
     }
 
-    verify(saver, never()).save(any(), any());
-    verify(db, never()).insertDocument(any(), any(), any(), any());
+    verify(mockHtmlSaver, never()).save(any(), any());
+    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
   }
 
   @Test
@@ -76,9 +76,9 @@ class CrawlTaskTests {
     when(doc.select("meta[name=description]")).thenReturn(mock(Elements.class));
     when(doc.select("a[href]")).thenReturn(new Elements());
 
-    when(queue.poll(10, TimeUnit.SECONDS)).thenReturn("http://example.com").thenReturn(null);
-    when(db.isUrlCrawled("http://example.com")).thenReturn(false);
-    when(saver.getFilePath("http://example.com")).thenReturn(examplePath);
+    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
+    when(mockHtmlSaver.getFilePath("http://example.com")).thenReturn(examplePath);
 
     // Static mocks must be closed after use
     try (MockedStatic<Robots> robotsMock = mockStatic(Robots.class);
@@ -94,29 +94,27 @@ class CrawlTaskTests {
       when(response.statusCode()).thenReturn(200);
       when(connection.response()).thenReturn(response);
       jsoupMock.when(() -> Jsoup.connect("http://example.com")).thenReturn(connection);
-
-      CrawlTask task = new CrawlTask(queue, visited, 5, db, saver);
+      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
       task.run();
     }
 
-    verify(saver).save(eq("http://example.com"), any());
-    verify(db)
+    verify(mockHtmlSaver).save(eq("http://example.com"), any());
+    verify(mockDatabase)
         .insertDocument(
             eq("http://example.com"), eq("Example Title"), any(), eq(examplePath.toString()));
   }
 
   @Test
   void testHandlesTimeoutGracefully() throws Exception {
-    // arrange
-    Set<String> visited = ConcurrentHashMap.newKeySet();
-    when(queue.poll(10, TimeUnit.SECONDS)).thenReturn("http://example.com").thenReturn(null);
-    when(db.isUrlCrawled("http://example.com")).thenReturn(false);
 
-    // stub Jsoup to throw timeout
+    Set<String> visited = ConcurrentHashMap.newKeySet();
+
+    when(mockQueue.poll(10, TimeUnit.SECONDS)).thenReturn(new UrlDepthPair("http://example.com", 0)).thenReturn(null);
+    when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
+
     org.jsoup.Connection mockConn = mock(org.jsoup.Connection.class);
     when(mockConn.get()).thenThrow(new SocketTimeoutException("timeout"));
 
-    // *both* static mocks in try-with-resources*
     try (MockedStatic<Robots> robotsMock = mockStatic(Robots.class);
         MockedStatic<Jsoup> jsoupMock = mockStatic(Jsoup.class)) {
 
@@ -124,12 +122,12 @@ class CrawlTaskTests {
 
       jsoupMock.when(() -> Jsoup.connect("http://example.com")).thenReturn(mockConn);
 
-      CrawlTask task = new CrawlTask(queue, visited, 5, db, saver);
+      CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5);
       task.run();
     }
 
     // assert it just returned cleanly:
-    verify(saver, never()).save(any(), any());
-    verify(db, never()).insertDocument(any(), any(), any(), any());
+    verify(mockHtmlSaver, never()).save(any(), any());
+    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
   }
 }
