@@ -19,3 +19,10 @@ CREATE TABLE IF NOT EXISTS document_words (
     FOREIGN KEY(word_id) REFERENCES words(id),
     PRIMARY KEY(document_id, word_id, position)
 );
+
+CREATE TABLE IF NOT EXISTS links (
+    source_document_id INTEGER,
+    target_url TEXT NOT NULL,
+    FOREIGN KEY(source_document_id) REFERENCES documents(id),
+    PRIMARY KEY(source_document_id, target_url)
+);
