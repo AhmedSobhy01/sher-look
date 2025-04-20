@@ -43,7 +43,7 @@ class PersistentQueueTests {
     queue.offer(new UrlDepthPair(url, 0)); // duplicate
 
     UrlDepthPair polled = queue.poll(1, TimeUnit.SECONDS);
-    assertEquals(url, polled);
+    assertEquals(new UrlDepthPair(url, 0), polled);
 
     UrlDepthPair shouldBeNull = queue.poll(1, TimeUnit.SECONDS);
     assertNull(shouldBeNull);
@@ -55,11 +55,10 @@ class PersistentQueueTests {
     queue.offer(new UrlDepthPair(url, 0));
     UrlDepthPair polled = queue.poll(1, TimeUnit.SECONDS);
 
-    assertEquals(url, polled);
+    assertEquals(new UrlDepthPair(url, 0), polled);
 
     // Read the file manually to verify "V_" line exists
-    boolean foundVLine =
-        Files.readAllLines(tempFilePath).stream().anyMatch(line -> line.startsWith("V_"));
+    boolean foundVLine = Files.readAllLines(tempFilePath).stream().anyMatch(line -> line.startsWith("V_"));
     assertTrue(foundVLine, "Polled URL should be marked as visited in file");
   }
 
@@ -67,8 +66,7 @@ class PersistentQueueTests {
   void testConstructorLoadsUncrawledUrls() throws Exception {
     Files.writeString(tempFilePath, "U_http://example.com 0\nU_http://second.com 1\n");
 
-    PersistentQueue reloaded =
-        new PersistentQueue(tempFilePath.toFile(), ConcurrentHashMap.newKeySet());
+    PersistentQueue reloaded = new PersistentQueue(tempFilePath.toFile(), ConcurrentHashMap.newKeySet());
     UrlDepthPair first = reloaded.poll(1, TimeUnit.SECONDS);
     UrlDepthPair second = reloaded.poll(1, TimeUnit.SECONDS);
 
