@@ -20,7 +20,7 @@ public class PersistentQueue {
   boolean intiallyEmpty = true;
   private long currentPosition = 0;
 
-  public PersistentQueue(File queueFile) throws IOException {
+  public PersistentQueue(File queueFile, Set<String> visitedUrlsSet) throws IOException {
     this.queueFile = queueFile;
 
     if (queueFile.exists()) {
@@ -43,6 +43,16 @@ public class PersistentQueue {
             uncrawledSet.add(urlDepthPair);
             queue.offer(urlDepthPair);
             urlPositionMap.put(urlDepthPair, currentPosition);
+          } else if (line != null && line.startsWith("V_")) {
+            line = line.substring(2);
+            String[] parts = line.split(" ");
+            String url = UrlNormalizer.normalize(line);
+            int depth = Integer.parseInt(parts[1]);
+            if (url == null) {
+              continue;
+            }
+            UrlDepthPair urlDepthPair = new UrlDepthPair(url, depth);
+            visitedUrlsSet.add(urlDepthPair.getUrl());
           }
           currentPosition = file.getFilePointer();
         }
