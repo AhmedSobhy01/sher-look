@@ -145,6 +145,7 @@ public class CrawlTask implements Runnable {
       }
       ConsoleColors.printError(crawlTaskString);
       System.err.println("Error: " + e.getMessage());
+      e.printStackTrace();
       return true;
     }
   }
