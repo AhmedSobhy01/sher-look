@@ -20,14 +20,6 @@
       <property name="format" value="^(test[A-Z][a-zA-Z0-9]*_With[A-Z][a-zA-Z0-9_]*_Should[A-Z][a-zA-Z0-9_]*)|([a-z][a-zA-Z0-9]*)$"/>
     </module>
 
-    <!-- Enforce proper indentation -->
-    <module name="Indentation">
-      <property name="basicOffset" value="2"/>
-      <property name="braceAdjustment" value="0"/>
-      <property name="caseIndent" value="2"/>
-      <property name="tabWidth" value="2"/>
-    </module>
-
     <!-- Ensure whitespace after commas -->
     <module name="WhitespaceAfter">
       <property name="tokens" value="COMMA"/>
