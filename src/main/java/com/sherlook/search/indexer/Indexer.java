@@ -1,102 +1,141 @@
 package com.sherlook.search.indexer;
 
+import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.io.File;
-import java.io.IOException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 @Component
 public class Indexer {
   private final DatabaseHelper databaseHelper;
+  private final PlatformTransactionManager txManager;
+  private final Tokenizer tokenizer;
 
   @Autowired
-  public Indexer(DatabaseHelper databaseHelper) {
+  public Indexer(
+      DatabaseHelper databaseHelper, PlatformTransactionManager txManager, Tokenizer tokenizer) {
     this.databaseHelper = databaseHelper;
+    this.txManager = txManager;
+    this.tokenizer = tokenizer;
   }
 
   public void indexDocument(Document document) {
-    String filePath = document.getFilePath();
-    long startTime = System.currentTimeMillis();
+    TransactionStatus status = txManager.getTransaction(new DefaultTransactionDefinition());
 
     try {
+      String filePath = document.getFilePath();
+      long startTime = System.currentTimeMillis();
+
+      ConsoleColors.printInfo("Indexer");
+      System.out.println("Indexing document: " + filePath);
+
+      // Parse the HTML file
       File input = new File(filePath);
       org.jsoup.nodes.Document htmlDoc = Jsoup.parse(input, "UTF-8");
 
-      // Metadata
-      String extractedTitle = htmlDoc.title();
-      if (extractedTitle.isEmpty()) {
+      // Extract title and description
+      String title = htmlDoc.title();
+      if (title.isEmpty()) {
         Element firstHeader = htmlDoc.selectFirst("h1, h2, h3, h4, h5, h6");
-        if (firstHeader != null) {
-          extractedTitle = firstHeader.text();
-        }
+        if (firstHeader != null) title = firstHeader.text();
       }
 
-      String extractedDescription = "";
+      String description = "";
       Element metaDesc = htmlDoc.selectFirst("meta[name=description]");
       if (metaDesc != null) {
-        extractedDescription = metaDesc.attr("content");
+        description = metaDesc.attr("content");
       } else {
-        Element firstParagraph = htmlDoc.selectFirst("p");
-        if (firstParagraph != null) extractedDescription = firstParagraph.text();
+        Element p = htmlDoc.selectFirst("p");
+        if (p != null) description = p.text();
       }
 
-      databaseHelper.updateDocumentMetadata(document.getId(), extractedTitle, extractedDescription);
+      // Update the document metadata in the database
+      databaseHelper.updateDocumentMetadata(document.getId(), title, description);
+      ConsoleColors.printInfo("Indexer");
+      System.out.println("  Updated metadata for document ID=" + document.getId());
 
-      // Tokenize the content
-      String content = htmlDoc.text();
-      String[] tokens = content.toLowerCase().split("\\W+");
+      // Extract words from the document
+      List<String> words = new ArrayList<>();
+      List<Integer> positions = new ArrayList<>();
+      List<Section> sections = new ArrayList<>();
+      int pos = 0;
 
-      int validTokenCount = 0;
-      for (String token : tokens) if (token != null && !token.trim().isEmpty()) validTokenCount++;
+      if (!title.isEmpty())
+        pos =
+            tokenizer.tokenizeWithPositions(title, pos, words, positions, sections, Section.TITLE);
 
-      System.out.println(
-          "Indexing document ID " + document.getId() + " with " + validTokenCount + " tokens.");
+      for (Element el : htmlDoc.select("* :not(script):not(style)")) {
+        if (el.tagName().equals("title") || el.tagName().equals("meta") || el.ownText().isEmpty())
+          continue;
 
-      // Insert tokens into the database
-      int position = 0;
-      for (String token : tokens) {
-        token = token.trim();
-        if (token.isEmpty()) continue;
-
-        databaseHelper.insertDocumentWord(document.getId(), token, position);
-        position++;
+        Section sec = el.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
+        pos = tokenizer.tokenizeWithPositions(el.text(), pos, words, positions, sections, sec);
       }
 
-      // Update index_time
+      // Insert words into the database
+      if (!words.isEmpty()) {
+        databaseHelper.batchInsertDocumentWords(document.getId(), words, positions, sections);
+
+        ConsoleColors.printInfo("Indexer");
+        System.out.println(
+            "  Indexed " + words.size() + " words for document ID=" + document.getId());
+      }
+
+      // Update index time
       databaseHelper.updateIndexTime(document.getId());
-      long endTime = System.currentTimeMillis();
-      System.out.println("Updated index_time for document ID " + document.getId());
-      System.out.println("Indexing completed in " + (endTime - startTime) + " ms.");
 
-    } catch (IOException e) {
-      System.err.println("Error parsing file at " + filePath + " using jsoup: " + e.getMessage());
+      long elapsed = System.currentTimeMillis() - startTime;
+      ConsoleColors.printSuccess("Indexer");
+      System.out.println("Indexing completed in " + elapsed + " ms");
+
+      txManager.commit(status);
+    } catch (Exception e) {
+      txManager.rollback(status);
+      ConsoleColors.printError("Indexer");
+      System.err.println(
+          "Failed to index document ID="
+              + document.getId()
+              + ", rolled back. Cause: "
+              + e.getMessage());
     }
   }
 
   public Queue<Document> loadUnindexedDocuments() throws SQLException {
-    Queue<Document> queue = new LinkedList<>();
-    databaseHelper.getUnindexedDocuments().forEach(queue::add);
-    return queue;
+    ConsoleColors.printInfo("Indexer");
+    System.out.println("Loading unindexed documents...");
+    Queue<Document> q = new LinkedList<>();
+    databaseHelper.getUnindexedDocuments().forEach(q::add);
+    return q;
   }
 
   public void index() {
-    try {
-      Queue<Document> unindexedDocs = loadUnindexedDocuments();
-      System.out.println("Found " + unindexedDocs.size() + " unindexed documents.");
+    ConsoleColors.printInfo("Indexer");
+    System.out.println("Starting indexing run");
 
-      while (!unindexedDocs.isEmpty()) {
-        Document doc = unindexedDocs.poll();
-        indexDocument(doc);
+    try {
+      Queue<Document> docs = loadUnindexedDocuments();
+      System.out.println("Found " + docs.size() + " documents to index");
+
+      while (!docs.isEmpty()) {
+        indexDocument(docs.poll());
       }
-      System.out.println("Indexing complete.");
+
+      ConsoleColors.printSuccess("Indexer");
+      System.out.println("All done!");
     } catch (SQLException e) {
-      System.err.println("Error loading unindexed documents: " + e.getMessage());
+      ConsoleColors.printError("Indexer");
+      System.err.println("Could not load unindexed docs: " + e.getMessage());
     }
   }
 }

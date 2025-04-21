@@ -2,6 +2,9 @@ package com.sherlook.search.indexer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
@@ -13,7 +16,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,19 +25,25 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 @ExtendWith(MockitoExtension.class)
 public class IndexerTests {
 
   @Mock private DatabaseHelper databaseHelper;
+  @Mock private PlatformTransactionManager txManager;
+  @Mock private TransactionStatus txStatus;
+  @Mock private Tokenizer tokenizer;
 
   private Indexer indexer;
 
   @TempDir Path tempDir;
 
   private Document createTestDocument(int id, String filePath) {
-    Document doc = new Document(id, null, null, null, filePath, null);
-    return doc;
+    return new Document(id, null, null, null, filePath, null);
   }
 
   private File createHtmlFile(String fileName, String content) throws IOException {
@@ -48,44 +56,86 @@ public class IndexerTests {
 
   @BeforeEach
   void setUp() {
-    indexer = new Indexer(databaseHelper);
+    indexer = new Indexer(databaseHelper, txManager, tokenizer);
   }
 
   @Test
-  void testIndexDocument_WithValidHtmlFile_ShouldExtractMetadataAndTokens() throws IOException {
-    String htmlContent =
-        "<!DOCTYPE html><html><head><title>Test Title</title>"
-            + "<meta name=\"description\" content=\"Test Description\"></head>"
-            + "<body><p>This is a test document with some content.</p></body></html>";
+  void testIndexDocument_WithValidHtmlFile_ShouldExtractMetadataAndBatchInsert()
+      throws IOException {
+    when(txManager.getTransaction(any(DefaultTransactionDefinition.class))).thenReturn(txStatus);
 
-    File htmlFile = createHtmlFile("test.html", htmlContent);
-    Document document = createTestDocument(123, htmlFile.getAbsolutePath());
+    when(tokenizer.tokenizeWithPositions(anyString(), anyInt(), any(), any(), any(), any()))
+        .thenAnswer(
+            (Answer<Integer>)
+                invocation -> {
+                  String text = invocation.getArgument(0);
+                  int startPos = invocation.getArgument(1);
+                  List<String> tokens = invocation.getArgument(2);
+                  List<Integer> positions = invocation.getArgument(3);
+                  List<Section> sections = invocation.getArgument(4);
+                  Section section = invocation.getArgument(5);
 
-    indexer.indexDocument(document);
+                  String[] words = text.toLowerCase().split("\\W+");
+                  int pos = startPos;
+
+                  for (String word : words) {
+                    if (!word.isEmpty()) {
+                      tokens.add(word);
+                      positions.add(pos++);
+                      sections.add(section);
+                    }
+                  }
+
+                  return pos;
+                });
+
+    String html =
+        "<!DOCTYPE html><html><head>"
+            + "<title>Test Title</title>"
+            + "<meta name=\"description\" content=\"Test Description\">"
+            + "</head><body>"
+            + "<p>This is a test document with some content.</p>"
+            + "</body></html>";
+
+    File htmlFile = createHtmlFile("test.html", html);
+    Document doc = createTestDocument(123, htmlFile.getAbsolutePath());
+
+    indexer.indexDocument(doc);
+
+    verify(txManager).getTransaction(any(DefaultTransactionDefinition.class));
+    verify(txManager).commit(eq(txStatus));
 
     verify(databaseHelper)
         .updateDocumentMetadata(eq(123), eq("Test Title"), eq("Test Description"));
 
-    ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
-    ArgumentCaptor<Integer> positionCaptor = ArgumentCaptor.forClass(Integer.class);
-    verify(databaseHelper, atLeastOnce())
-        .insertDocumentWord(eq(123), tokenCaptor.capture(), positionCaptor.capture());
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<String>> wordsCaptor = ArgumentCaptor.forClass(List.class);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<Integer>> posCaptor = ArgumentCaptor.forClass(List.class);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<Section>> secCaptor = ArgumentCaptor.forClass(List.class);
 
-    List<String> capturedTokens = tokenCaptor.getAllValues();
-    assertTrue(capturedTokens.contains("test"));
-    assertTrue(capturedTokens.contains("document"));
-    assertTrue(capturedTokens.contains("content"));
+    verify(databaseHelper, atLeastOnce())
+        .batchInsertDocumentWords(
+            eq(123), wordsCaptor.capture(), posCaptor.capture(), secCaptor.capture());
+
+    List<String> tokens = wordsCaptor.getValue();
+    assertTrue(tokens.contains("test"));
+    assertTrue(tokens.contains("document"));
+    assertTrue(tokens.contains("content"));
+
+    List<Section> secs = secCaptor.getValue();
+    assertTrue(secs.contains(Section.TITLE));
+    assertTrue(secs.contains(Section.BODY));
 
     verify(databaseHelper).updateIndexTime(eq(123));
   }
 
   @Test
   void testLoadUnindexedDocuments_WithValidData_ShouldReturnQueueOfDocuments() throws SQLException {
-    Document doc1 = createTestDocument(1, "/doc1.html");
-    Document doc2 = createTestDocument(2, "/doc2.html");
-    List<Document> mockDocuments = Arrays.asList(doc1, doc2);
-
-    when(databaseHelper.getUnindexedDocuments()).thenReturn(mockDocuments);
+    Document d1 = createTestDocument(1, "/d1.html");
+    Document d2 = createTestDocument(2, "/d2.html");
+    when(databaseHelper.getUnindexedDocuments()).thenReturn(List.of(d1, d2));
 
     Queue<Document> result = indexer.loadUnindexedDocuments();
 
@@ -96,14 +146,16 @@ public class IndexerTests {
   }
 
   @Test
-  void testIndex_WithNonexistentFile_ShouldHandleGracefully() throws SQLException {
-    Document doc1 = createTestDocument(1, "/nonexistent.html");
-    List<Document> mockDocuments = Arrays.asList(doc1);
+  void testIndex_WithNonexistentFile_ShouldRollbackAndContinue() throws SQLException {
+    when(txManager.getTransaction(any(DefaultTransactionDefinition.class))).thenReturn(txStatus);
 
-    when(databaseHelper.getUnindexedDocuments()).thenReturn(mockDocuments);
+    Document badDoc = createTestDocument(1, "/no-such-file.html");
+    when(databaseHelper.getUnindexedDocuments()).thenReturn(List.of(badDoc));
 
     indexer.index();
 
+    verify(txManager).getTransaction(any(DefaultTransactionDefinition.class));
+    verify(txManager).rollback(eq(txStatus));
     verify(databaseHelper).getUnindexedDocuments();
   }
 }
