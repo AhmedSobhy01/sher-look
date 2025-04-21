@@ -20,11 +20,14 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 public class Indexer {
   private final DatabaseHelper databaseHelper;
   private final PlatformTransactionManager txManager;
+  private final Tokenizer tokenizer;
 
   @Autowired
-  public Indexer(DatabaseHelper databaseHelper, PlatformTransactionManager txManager) {
+  public Indexer(
+      DatabaseHelper databaseHelper, PlatformTransactionManager txManager, Tokenizer tokenizer) {
     this.databaseHelper = databaseHelper;
     this.txManager = txManager;
+    this.tokenizer = tokenizer;
   }
 
   public void indexDocument(Document document) {
@@ -68,30 +71,16 @@ public class Indexer {
       List<Section> sections = new ArrayList<>();
       int pos = 0;
 
-      if (!title.isEmpty()) {
-        for (String tok : title.toLowerCase().split("\\W+")) {
-          if (tok.isEmpty()) continue;
-          words.add(tok);
-          positions.add(pos);
-          sections.add(Section.TITLE);
-          pos++;
-        }
-      }
+      if (!title.isEmpty())
+        pos =
+            tokenizer.tokenizeWithPositions(title, pos, words, positions, sections, Section.TITLE);
 
       for (Element el : htmlDoc.select("* :not(script):not(style)")) {
-        if (el.tagName().equals("title") || el.tagName().equals("meta")) continue;
-        if (el.ownText().isEmpty()) continue;
+        if (el.tagName().equals("title") || el.tagName().equals("meta") || el.ownText().isEmpty())
+          continue;
 
         Section sec = el.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
-
-        for (String tok : el.text().toLowerCase().split("\\W+")) {
-          if (tok.isEmpty()) continue;
-
-          words.add(tok);
-          positions.add(pos);
-          sections.add(sec);
-          pos++;
-        }
+        pos = tokenizer.tokenizeWithPositions(el.text(), pos, words, positions, sections, sec);
       }
 
       // Insert words into the database
