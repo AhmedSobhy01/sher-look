@@ -93,8 +93,9 @@ public class DatabaseHelper {
     Integer wordId;
     try {
       wordId = jdbcTemplate.queryForObject(sql, Integer.class, word);
+      jdbcTemplate.update("UPDATE words SET count = count + 1 WHERE id = ?", wordId);
     } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-      sql = "INSERT INTO words (word) VALUES (?)";
+      sql = "INSERT INTO words (word, count) VALUES (?, 1)";
       jdbcTemplate.update(sql, word);
       wordId = jdbcTemplate.queryForObject("SELECT last_insert_rowid()", Integer.class);
     }
@@ -184,6 +185,10 @@ public class DatabaseHelper {
 
     Set<String> uniqueWords = new HashSet<>(words);
 
+    // Count of each word
+    Map<String, Integer> wordCounts = new HashMap<>();
+    for (String word : words) wordCounts.put(word, wordCounts.getOrDefault(word, 0) + 1);
+
     // Get existing words
     List<Map<String, Object>> existingWords = Collections.emptyList();
     if (!uniqueWords.isEmpty()) {
@@ -198,14 +203,17 @@ public class DatabaseHelper {
           Integer id = ((Number) row.get("id")).intValue();
           wordIds.put(word, id);
           uniqueWords.remove(word);
+
+          if (wordCounts.get(word) > 0)
+            jdbcTemplate.update("UPDATE words SET count = count + ? WHERE id = ?", wordCounts.get(word), id);
         });
 
     // Insert new words
     if (!uniqueWords.isEmpty()) {
       List<Object[]> newWords = new ArrayList<>();
-      for (String word : uniqueWords) newWords.add(new Object[] {word});
+      for (String word : uniqueWords) newWords.add(new Object[] {word, wordCounts.get(word)});
 
-      jdbcTemplate.batchUpdate("INSERT INTO words (word) VALUES (?)", newWords);
+      jdbcTemplate.batchUpdate("INSERT INTO words (word, count) VALUES (?, ?)", newWords);
 
       List<Map<String, Object>> insertedWords =
           jdbcTemplate.queryForList(

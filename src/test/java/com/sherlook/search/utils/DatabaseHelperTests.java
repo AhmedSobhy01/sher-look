@@ -273,4 +273,39 @@ class DatabaseHelperTests {
         document.get("index_time").toString().contains("2023-01-01"),
         "Index time should contain the specified date");
   }
+
+  @Test
+  void testGetDocumentWordCount() {
+    String url = TEST_URL_PREFIX + "word-count";
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+
+    List<Map<String, Object>> results =
+        jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
+    int documentId = ((Number) results.get(0).get("id")).intValue();
+
+    List<String> words = Arrays.asList("word1", "word2", "word3", "word4", "word5");
+    List<Integer> positions = Arrays.asList(0, 1, 2, 3, 4);
+    List<Section> sections =
+        Arrays.asList(Section.TITLE, Section.HEADER, Section.BODY, Section.BODY, Section.BODY);
+
+    databaseHelper.batchInsertDocumentWords(documentId, words, positions, sections);
+
+    int wordCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM document_words WHERE document_id = ?", Integer.class, documentId);
+
+    assertEquals(5, wordCount, "Document should have 5 words");
+
+    String emptyUrl = TEST_URL_PREFIX + "empty-doc";
+    databaseHelper.insertDocument(emptyUrl, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+
+    results = jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", emptyUrl);
+    int emptyDocId = ((Number) results.get(0).get("id")).intValue();
+
+    int emptyWordCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM document_words WHERE document_id = ?", Integer.class, emptyDocId);
+
+    assertEquals(0, emptyWordCount, "Empty document should have 0 words");
+  }
 }
