@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.*;
 
@@ -15,7 +17,8 @@ class PersistentQueueTests {
   @BeforeEach
   void setUp() throws IOException {
     tempFilePath = Files.createTempFile("queue", ".txt");
-    queue = new PersistentQueue(tempFilePath.toFile());
+    Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
+    queue = new PersistentQueue(tempFilePath.toFile(), visitedUrls);
   }
 
   @AfterEach
@@ -27,32 +30,32 @@ class PersistentQueueTests {
   void testOfferAddsNewUrl() throws Exception {
     String url = "http://example.com";
 
-    queue.offer(url);
-    String polled = queue.poll(1, TimeUnit.SECONDS);
+    queue.offer(new UrlDepthPair(url, 0));
+    UrlDepthPair polled = queue.poll(1, TimeUnit.SECONDS);
 
-    assertEquals("http://example.com", polled);
+    assertEquals(new UrlDepthPair("http://example.com", 0), polled);
   }
 
   @Test
   void testOfferIgnoresDuplicateUrl() throws Exception {
     String url = "http://example.com";
-    queue.offer(url);
-    queue.offer(url); // duplicate
+    queue.offer(new UrlDepthPair(url, 0));
+    queue.offer(new UrlDepthPair(url, 0)); // duplicate
 
-    String polled = queue.poll(1, TimeUnit.SECONDS);
-    assertEquals(url, polled);
+    UrlDepthPair polled = queue.poll(1, TimeUnit.SECONDS);
+    assertEquals(new UrlDepthPair(url, 0), polled);
 
-    String shouldBeNull = queue.poll(1, TimeUnit.SECONDS);
+    UrlDepthPair shouldBeNull = queue.poll(1, TimeUnit.SECONDS);
     assertNull(shouldBeNull);
   }
 
   @Test
   void testPollMarksUrlAsVisited() throws Exception {
     String url = "http://visited.com";
-    queue.offer(url);
-    String polled = queue.poll(1, TimeUnit.SECONDS);
+    queue.offer(new UrlDepthPair(url, 0));
+    UrlDepthPair polled = queue.poll(1, TimeUnit.SECONDS);
 
-    assertEquals(url, polled);
+    assertEquals(new UrlDepthPair(url, 0), polled);
 
     // Read the file manually to verify "V_" line exists
     boolean foundVLine =
@@ -62,14 +65,15 @@ class PersistentQueueTests {
 
   @Test
   void testConstructorLoadsUncrawledUrls() throws Exception {
-    Files.writeString(tempFilePath, "U_http://example.com\nU_http://second.com\n");
+    Files.writeString(tempFilePath, "U_http://example.com 0\nU_http://second.com 1\n");
 
-    PersistentQueue reloaded = new PersistentQueue(tempFilePath.toFile());
-    String first = reloaded.poll(1, TimeUnit.SECONDS);
-    String second = reloaded.poll(1, TimeUnit.SECONDS);
+    PersistentQueue reloaded =
+        new PersistentQueue(tempFilePath.toFile(), ConcurrentHashMap.newKeySet());
+    UrlDepthPair first = reloaded.poll(1, TimeUnit.SECONDS);
+    UrlDepthPair second = reloaded.poll(1, TimeUnit.SECONDS);
 
-    assertEquals("http://example.com", first);
-    assertEquals("http://second.com", second);
+    assertEquals(new UrlDepthPair("http://example.com", 0), first);
+    assertEquals(new UrlDepthPair("http://second.com", 1), second);
   }
 
   @Test

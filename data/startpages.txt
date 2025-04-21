@@ -1,23 +1,23 @@
-https://en.wikipedia.org
-https://www.britannica.com
-https://www.bbc.com
-https://www.cnn.com
-https://www.nytimes.com
-https://www.reuters.com
-https://www.khanacademy.org
-https://ocw.mit.edu
-https://www.edx.org
-https://www.coursera.org
-https://stackoverflow.com
-https://www.reddit.com
-https://news.ycombinator.com
-https://developer.mozilla.org
-https://docs.oracle.com
-https://www.geeksforgeeks.org
-https://www.w3schools.com
-https://www.gutenberg.org
-https://openlibrary.org
-https://www.amazon.com
-https://www.ebay.com
-https://dribbble.com
-https://www.behance.net
+https://en.wikipedia.org 0
+https://www.britannica.com 0
+https://www.bbc.com 0
+https://www.cnn.com 0
+https://www.nytimes.com 0
+https://www.reuters.com 0
+https://www.khanacademy.org 0
+https://ocw.mit.edu 0
+https://www.edx.org 0
+https://www.coursera.org 0
+https://stackoverflow.com 0
+https://www.reddit.com 0
+https://news.ycombinator.com 0
+https://developer.mozilla.org 0
+https://docs.oracle.com 0
+https://www.geeksforgeeks.org 0
+https://www.w3schools.com 0
+https://www.gutenberg.org 0
+https://openlibrary.org 0
+https://www.amazon.com 0
+https://www.ebay.com 0
+https://dribbble.com 0
+https://www.behance.net 0

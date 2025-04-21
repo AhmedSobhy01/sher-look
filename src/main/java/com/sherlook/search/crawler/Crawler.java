@@ -31,6 +31,9 @@ public class Crawler {
   @Value("${crawler.url-queue-file}")
   private String urlQueueFilePath;
 
+  @Value("${crawler.max-depth}")
+  private int maxDepth;
+
   private final DatabaseHelper databaseHelper;
 
   private final Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
@@ -59,7 +62,7 @@ public class Crawler {
         htmlSaver = new HtmlSaver(saveDirPath);
       }
       if (urlQueue == null) {
-        urlQueue = new PersistentQueue(new File(urlQueueFilePath));
+        urlQueue = new PersistentQueue(new File(urlQueueFilePath), visitedUrls);
       }
     } catch (IOException e) {
       ConsoleColors.printError("Crawler");
@@ -86,8 +89,12 @@ public class Crawler {
       ConsoleColors.printInfo("Crawler");
       System.out.println("Starting with empty queue. Reading start pages from " + startPagesPath);
       try (BufferedReader bf = new BufferedReader(new java.io.FileReader(startPagesPath))) {
-        String startUrl;
-        while ((startUrl = bf.readLine()) != null) {
+        String startUrlPair;
+        while ((startUrlPair = bf.readLine()) != null) {
+          String[] parts = startUrlPair.split(" ");
+          String url = parts[0];
+          int depth = Integer.parseInt(parts[1]);
+          UrlDepthPair startUrl = new UrlDepthPair(url, depth);
           urlQueue.offer(startUrl);
         }
       } catch (Exception e) {
@@ -98,7 +105,8 @@ public class Crawler {
     }
 
     for (int i = 0; i < threads; i++) {
-      executor.execute(new CrawlTask(urlQueue, visitedUrls, maxPages, databaseHelper, htmlSaver));
+      executor.execute(
+          new CrawlTask(urlQueue, visitedUrls, maxPages, databaseHelper, htmlSaver, maxDepth, i));
     }
 
     executor.shutdown();

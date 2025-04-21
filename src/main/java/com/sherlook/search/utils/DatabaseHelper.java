@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class DatabaseHelper {
@@ -23,10 +24,39 @@ public class DatabaseHelper {
     this.jdbcTemplate.setDataSource(jdbcTemplate.getDataSource());
   }
 
+  @Transactional
   public void insertDocument(String url, String title, String description, String filePath) {
     String sql =
-        "INSERT INTO documents (url, title, description, file_path, crawl_time) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)";
+        """
+        INSERT INTO documents (url, title, description, file_path, crawl_time)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """;
     jdbcTemplate.update(sql, url, title, description, filePath);
+  }
+
+  @Transactional
+  public void insertLinks(int documentId, List<String> links) {
+    String sql = "INSERT INTO links (source_document_id, target_url) VALUES (?, ?)";
+    jdbcTemplate.batchUpdate(
+        sql,
+        links,
+        links.size(),
+        (ps, link) -> {
+          ps.setInt(1, documentId);
+          ps.setString(2, link);
+        });
+  }
+
+  @Transactional
+  public int getDocumentId(String url) {
+    String sql = "SELECT id FROM documents WHERE url = ?";
+    Integer documentId;
+    try {
+      documentId = jdbcTemplate.queryForObject(sql, Integer.class, url);
+    } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+      return -1;
+    }
+    return documentId != null ? documentId : -1;
   }
 
   public List<DocumentWord> getDocumentWords() {
