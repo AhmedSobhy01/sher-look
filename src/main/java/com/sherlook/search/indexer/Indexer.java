@@ -44,7 +44,7 @@ public class Indexer {
       File input = new File(filePath);
       org.jsoup.nodes.Document htmlDoc = Jsoup.parse(input, "UTF-8");
 
-      //
+      // Extract title and description
       String title = htmlDoc.title();
       if (title.isEmpty()) {
         Element firstHeader = htmlDoc.selectFirst("h1, h2, h3, h4, h5, h6");
