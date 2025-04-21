@@ -3,134 +3,150 @@ package com.sherlook.search.indexer;
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.io.File;
-import java.io.IOException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 @Component
 public class Indexer {
   private final DatabaseHelper databaseHelper;
+  private final PlatformTransactionManager txManager;
 
   @Autowired
-  public Indexer(DatabaseHelper databaseHelper) {
+  public Indexer(DatabaseHelper databaseHelper, PlatformTransactionManager txManager) {
     this.databaseHelper = databaseHelper;
+    this.txManager = txManager;
   }
 
   public void indexDocument(Document document) {
-    String filePath = document.getFilePath();
-    long startTime = System.currentTimeMillis();
-
-    ConsoleColors.printInfo("Indexer");
-    System.out.println("Indexing document: " + filePath);
+    TransactionStatus status = txManager.getTransaction(new DefaultTransactionDefinition());
 
     try {
+      String filePath = document.getFilePath();
+      long startTime = System.currentTimeMillis();
+
+      ConsoleColors.printInfo("Indexer");
+      System.out.println("Indexing document: " + filePath);
+
+      // Parse the HTML file
       File input = new File(filePath);
       org.jsoup.nodes.Document htmlDoc = Jsoup.parse(input, "UTF-8");
 
-      // Metadata
-      String extractedTitle = htmlDoc.title();
-      if (extractedTitle.isEmpty()) {
+      //
+      String title = htmlDoc.title();
+      if (title.isEmpty()) {
         Element firstHeader = htmlDoc.selectFirst("h1, h2, h3, h4, h5, h6");
-        if (firstHeader != null) {
-          extractedTitle = firstHeader.text();
-        }
+        if (firstHeader != null) title = firstHeader.text();
       }
 
-      String extractedDescription = "";
+      String description = "";
       Element metaDesc = htmlDoc.selectFirst("meta[name=description]");
       if (metaDesc != null) {
-        extractedDescription = metaDesc.attr("content");
+        description = metaDesc.attr("content");
       } else {
-        Element firstParagraph = htmlDoc.selectFirst("p");
-        if (firstParagraph != null) extractedDescription = firstParagraph.text();
+        Element p = htmlDoc.selectFirst("p");
+        if (p != null) description = p.text();
       }
 
-      databaseHelper.updateDocumentMetadata(document.getId(), extractedTitle, extractedDescription);
+      // Update the document metadata in the database
+      databaseHelper.updateDocumentMetadata(document.getId(), title, description);
       ConsoleColors.printInfo("Indexer");
-      System.out.println("Updated metadata for document ID " + document.getId());
+      System.out.println("  Updated metadata for document ID=" + document.getId());
 
-      int currentPosition = 0;
+      // Extract words from the document
+      List<String> words = new ArrayList<>();
+      List<Integer> positions = new ArrayList<>();
+      List<Section> sections = new ArrayList<>();
+      int pos = 0;
 
-      // Index title
-      if (!extractedTitle.isEmpty()) {
-        String[] titleTokens = extractedTitle.toLowerCase().split("\\W+");
-        for (String token : titleTokens) {
-          token = token.trim();
-          if (token.isEmpty()) continue;
-          databaseHelper.insertDocumentWord(
-              document.getId(), token, currentPosition, Section.TITLE);
-          currentPosition++;
+      if (!title.isEmpty()) {
+        for (String tok : title.toLowerCase().split("\\W+")) {
+          if (tok.isEmpty()) continue;
+          words.add(tok);
+          positions.add(pos);
+          sections.add(Section.TITLE);
+          pos++;
         }
       }
 
-      // Index rest of page content
-      for (Element element : htmlDoc.select("* :not(script):not(style)")) {
-        if (element.tagName().equals("title") || element.tagName().equals("meta")) continue;
+      for (Element el : htmlDoc.select("* :not(script):not(style)")) {
+        if (el.tagName().equals("title") || el.tagName().equals("meta")) continue;
+        if (el.ownText().isEmpty()) continue;
 
-        if (element.ownText().isEmpty()) continue;
+        Section sec = el.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
 
-        Section section = element.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
+        for (String tok : el.text().toLowerCase().split("\\W+")) {
+          if (tok.isEmpty()) continue;
 
-        String[] tokens = element.text().toLowerCase().split("\\W+");
-        for (String token : tokens) {
-          token = token.trim();
-
-          if (token.isEmpty()) continue;
-
-          databaseHelper.insertDocumentWord(document.getId(), token, currentPosition, section);
-          currentPosition++;
+          words.add(tok);
+          positions.add(pos);
+          sections.add(sec);
+          pos++;
         }
       }
 
-      ConsoleColors.printInfo("Indexer");
-      System.out.println("Indexed words for document ID " + document.getId());
+      // Insert words into the database
+      if (!words.isEmpty()) {
+        databaseHelper.batchInsertDocumentWords(document.getId(), words, positions, sections);
 
-      // Update index_time
+        ConsoleColors.printInfo("Indexer");
+        System.out.println(
+            "  Indexed " + words.size() + " words for document ID=" + document.getId());
+      }
+
+      // Update index time
       databaseHelper.updateIndexTime(document.getId());
-      long endTime = System.currentTimeMillis();
-      ConsoleColors.printSuccess("Indexer");
-      System.out.println("Updated index_time for document ID " + document.getId());
 
+      long elapsed = System.currentTimeMillis() - startTime;
       ConsoleColors.printSuccess("Indexer");
-      System.out.println("Indexing completed in " + (endTime - startTime) + " ms");
+      System.out.println("Indexing completed in " + elapsed + " ms");
 
-    } catch (IOException e) {
+      txManager.commit(status);
+    } catch (Exception e) {
+      txManager.rollback(status);
       ConsoleColors.printError("Indexer");
-      System.err.println("Error parsing file at " + filePath + " using jsoup: " + e.getMessage());
+      System.err.println(
+          "Failed to fully index document ID="
+              + document.getId()
+              + ", rolled back. Cause: "
+              + e.getMessage());
     }
   }
 
   public Queue<Document> loadUnindexedDocuments() throws SQLException {
     ConsoleColors.printInfo("Indexer");
-    System.out.println("Loading unindexed documents from database");
-    Queue<Document> queue = new LinkedList<>();
-    databaseHelper.getUnindexedDocuments().forEach(queue::add);
-    return queue;
+    System.out.println("Loading unindexed documents...");
+    Queue<Document> q = new LinkedList<>();
+    databaseHelper.getUnindexedDocuments().forEach(q::add);
+    return q;
   }
 
   public void index() {
     ConsoleColors.printInfo("Indexer");
-    System.out.println("Starting indexing process");
+    System.out.println("Starting indexing run");
 
     try {
-      Queue<Document> unindexedDocs = loadUnindexedDocuments();
-      ConsoleColors.printInfo("Indexer");
-      System.out.println("Found " + unindexedDocs.size() + " unindexed documents");
+      Queue<Document> docs = loadUnindexedDocuments();
+      System.out.println("Found " + docs.size() + " documents to index");
 
-      while (!unindexedDocs.isEmpty()) {
-        Document doc = unindexedDocs.poll();
-        indexDocument(doc);
+      while (!docs.isEmpty()) {
+        indexDocument(docs.poll());
       }
+
       ConsoleColors.printSuccess("Indexer");
-      System.out.println("Indexing complete");
+      System.out.println("All done!");
     } catch (SQLException e) {
       ConsoleColors.printError("Indexer");
-      System.err.println("Error loading unindexed documents: " + e.getMessage());
+      System.err.println("Could not load unindexed docs: " + e.getMessage());
     }
   }
 }

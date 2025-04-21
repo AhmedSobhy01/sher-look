@@ -5,7 +5,13 @@ import com.sherlook.search.indexer.DocumentWord;
 import com.sherlook.search.indexer.Section;
 import com.sherlook.search.indexer.Word;
 import com.sherlook.search.ranker.RankedDocument;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -170,5 +176,73 @@ public class DatabaseHelper {
                 rs.getString("url"),
                 rs.getString("title"),
                 rs.getDouble("tf_idf")));
+  }
+
+  public Map<String, Integer> getOrCreateWordIds(List<String> words) {
+    Map<String, Integer> wordIds = new HashMap<>();
+    if (words.isEmpty()) return wordIds;
+
+    Set<String> uniqueWords = new HashSet<>(words);
+
+    // Get existing words
+    List<Map<String, Object>> existingWords = Collections.emptyList();
+    if (!uniqueWords.isEmpty()) {
+      String placeholders = String.join(",", Collections.nCopies(uniqueWords.size(), "?"));
+      String selectSql = "SELECT id, word FROM words WHERE word IN (" + placeholders + ")";
+      existingWords = jdbcTemplate.queryForList(selectSql, uniqueWords.toArray());
+    }
+
+    existingWords.forEach(
+        row -> {
+          String word = (String) row.get("word");
+          Integer id = ((Number) row.get("id")).intValue();
+          wordIds.put(word, id);
+          uniqueWords.remove(word);
+        });
+
+    // Insert new words
+    if (!uniqueWords.isEmpty()) {
+      List<Object[]> newWords = new ArrayList<>();
+      for (String word : uniqueWords) newWords.add(new Object[] {word});
+
+      jdbcTemplate.batchUpdate("INSERT INTO words (word) VALUES (?)", newWords);
+
+      List<Map<String, Object>> insertedWords =
+          jdbcTemplate.queryForList(
+              "SELECT id, word FROM words WHERE word IN ("
+                  + String.join(",", Collections.nCopies(uniqueWords.size(), "?"))
+                  + ")",
+              uniqueWords.toArray());
+
+      insertedWords.forEach(
+          row -> {
+            String word = (String) row.get("word");
+            Integer id = ((Number) row.get("id")).intValue();
+            wordIds.put(word, id);
+          });
+    }
+
+    return wordIds;
+  }
+
+  public void batchInsertDocumentWords(
+      int documentId, List<String> words, List<Integer> positions, List<Section> sections) {
+    if (words.isEmpty() || words.size() != positions.size() || words.size() != sections.size()) {
+      return;
+    }
+
+    Map<String, Integer> wordIds = getOrCreateWordIds(words);
+
+    List<Object[]> batch = new ArrayList<>(words.size());
+    for (int i = 0; i < words.size(); i++) {
+      batch.add(
+          new Object[] {
+            documentId, wordIds.get(words.get(i)), positions.get(i), sections.get(i).toString()
+          });
+    }
+
+    jdbcTemplate.batchUpdate(
+        "INSERT INTO document_words (document_id, word_id, position, section) VALUES (?, ?, ?, ?)",
+        batch);
   }
 }
