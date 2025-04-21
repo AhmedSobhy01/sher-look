@@ -17,14 +17,13 @@ public class PersistentQueue {
   private final Set<UrlDepthPair> uncrawledSet = ConcurrentHashMap.newKeySet();
   private final Map<UrlDepthPair, Long> urlPositionMap = new ConcurrentHashMap<>();
   private final File queueFile;
-  boolean intiallyEmpty = true;
+  boolean intiallyEmpty;
   private long currentPosition = 0;
 
   public PersistentQueue(File queueFile, Set<String> visitedUrlsSet) throws IOException {
     this.queueFile = queueFile;
 
     if (queueFile.exists()) {
-      intiallyEmpty = false;
       try (RandomAccessFile file = new RandomAccessFile(queueFile, "r")) {
         String line;
         file.seek(0);
@@ -67,17 +66,24 @@ public class PersistentQueue {
         }
       }
 
-      ConsoleColors.printInfo("PersistentQueue");
-      System.out.println("Queue loaded successfully. Size: " + queue.size());
-      ConsoleColors.printInfo("PersistentQueue");
-      System.out.println("Visited URLs loaded successfully. Size: " + visitedUrlsSet.size());
     } else {
       ConsoleColors.printInfo("PersistentQueue");
       System.out.println(
           "Queue file does not exist. Creating a new one: " + queueFile.getAbsolutePath());
-      intiallyEmpty = true;
       queueFile.getParentFile().mkdirs();
       queueFile.createNewFile();
+    }
+
+    intiallyEmpty = queue.isEmpty();
+
+    if (intiallyEmpty) {
+      ConsoleColors.printWarning("PersistentQueue");
+      System.out.println("Queue is empty.");
+    } else {
+      ConsoleColors.printInfo("PersistentQueue");
+      System.out.println("Queue loaded successfully. Size: " + queue.size());
+      ConsoleColors.printInfo("PersistentQueue");
+      System.out.println("Visited URLs loaded successfully. Size: " + visitedUrlsSet.size());
     }
   }
 
