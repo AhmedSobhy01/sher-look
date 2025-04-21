@@ -16,8 +16,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +57,12 @@ public class IndexerTests {
   @BeforeEach
   void setUp() {
     indexer = new Indexer(databaseHelper, txManager, tokenizer);
+  }
+
+  @Test
+  void testIndexDocument_WithValidHtmlFile_ShouldExtractMetadataAndBatchInsert()
+      throws IOException {
+    when(txManager.getTransaction(any(DefaultTransactionDefinition.class))).thenReturn(txStatus);
 
     when(tokenizer.tokenizeWithPositions(anyString(), anyInt(), any(), any(), any(), any()))
         .thenAnswer(
@@ -84,24 +88,6 @@ public class IndexerTests {
 
                   return pos;
                 });
-
-    when(tokenizer.tokenize(anyString()))
-        .thenAnswer(
-            invocation -> {
-              String text = invocation.getArgument(0);
-              if (text == null || text.isEmpty()) {
-                return new ArrayList<String>();
-              }
-              return Arrays.stream(text.toLowerCase().split("\\W+"))
-                  .filter(s -> !s.isEmpty())
-                  .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-            });
-  }
-
-  @Test
-  void testIndexDocument_WithValidHtmlFile_ShouldExtractMetadataAndBatchInsert()
-      throws IOException {
-    when(txManager.getTransaction(any(DefaultTransactionDefinition.class))).thenReturn(txStatus);
 
     String html =
         "<!DOCTYPE html><html><head>"
