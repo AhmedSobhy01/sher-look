@@ -115,7 +115,7 @@ public class Indexer {
       txManager.rollback(status);
       ConsoleColors.printError("Indexer");
       System.err.println(
-          "Failed to fully index document ID="
+          "Failed to index document ID="
               + document.getId()
               + ", rolled back. Cause: "
               + e.getMessage());
