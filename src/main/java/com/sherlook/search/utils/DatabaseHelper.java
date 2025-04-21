@@ -205,7 +205,8 @@ public class DatabaseHelper {
           uniqueWords.remove(word);
 
           if (wordCounts.get(word) > 0)
-            jdbcTemplate.update("UPDATE words SET count = count + ? WHERE id = ?", wordCounts.get(word), id);
+            jdbcTemplate.update(
+                "UPDATE words SET count = count + ? WHERE id = ?", wordCounts.get(word), id);
         });
 
     // Insert new words
