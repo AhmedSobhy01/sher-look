@@ -68,13 +68,20 @@ public class IndexerTests {
 
     ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Integer> positionCaptor = ArgumentCaptor.forClass(Integer.class);
+    ArgumentCaptor<Section> sectionCaptor = ArgumentCaptor.forClass(Section.class);
+
     verify(databaseHelper, atLeastOnce())
-        .insertDocumentWord(eq(123), tokenCaptor.capture(), positionCaptor.capture());
+        .insertDocumentWord(
+            eq(123), tokenCaptor.capture(), positionCaptor.capture(), sectionCaptor.capture());
 
     List<String> capturedTokens = tokenCaptor.getAllValues();
     assertTrue(capturedTokens.contains("test"));
     assertTrue(capturedTokens.contains("document"));
     assertTrue(capturedTokens.contains("content"));
+
+    List<Section> capturedSections = sectionCaptor.getAllValues();
+    assertTrue(capturedSections.contains(Section.TITLE), "Should index words in TITLE section");
+    assertTrue(capturedSections.contains(Section.BODY), "Should index words in BODY section");
 
     verify(databaseHelper).updateIndexTime(eq(123));
   }

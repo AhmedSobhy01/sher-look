@@ -2,6 +2,7 @@ package com.sherlook.search.utils;
 
 import com.sherlook.search.indexer.Document;
 import com.sherlook.search.indexer.DocumentWord;
+import com.sherlook.search.indexer.Section;
 import com.sherlook.search.indexer.Word;
 import com.sherlook.search.ranker.RankedDocument;
 import java.util.List;
@@ -32,7 +33,7 @@ public class DatabaseHelper {
   public List<DocumentWord> getDocumentWords() {
     String sql =
         "SELECT d.id AS document_id, d.url, d.title, d.description, d.file_path, d.crawl_time, "
-            + "w.id AS word_id, w.word, dw.position "
+            + "w.id AS word_id, w.word, dw.position, dw.section "
             + "FROM documents d "
             + "JOIN document_words dw ON d.id = dw.document_id "
             + "JOIN words w ON dw.word_id = w.id "
@@ -51,7 +52,8 @@ public class DatabaseHelper {
                   rs.getString("file_path"),
                   rs.getTimestamp("crawl_time"));
 
-          return new DocumentWord(document, word, rs.getInt("position"));
+          return new DocumentWord(
+              document, word, rs.getInt("position"), Section.fromString(rs.getString("section")));
         });
   }
 
@@ -80,7 +82,7 @@ public class DatabaseHelper {
                 rs.getTimestamp("crawl_time")));
   }
 
-  public void insertDocumentWord(int documentId, String word, int position) {
+  public void insertDocumentWord(int documentId, String word, int position, Section section) {
     String sql = "SELECT id FROM words WHERE word = ?";
     Integer wordId;
     try {
@@ -91,8 +93,9 @@ public class DatabaseHelper {
       wordId = jdbcTemplate.queryForObject("SELECT last_insert_rowid()", Integer.class);
     }
 
-    sql = "INSERT INTO document_words (document_id, word_id, position) VALUES (?, ?, ?)";
-    jdbcTemplate.update(sql, documentId, wordId, position);
+    sql =
+        "INSERT INTO document_words (document_id, word_id, position, section) VALUES (?, ?, ?, ?)";
+    jdbcTemplate.update(sql, documentId, wordId, position, section.toString());
   }
 
   public void updateDocumentMetadata(int documentId, String title, String description) {
