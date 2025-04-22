@@ -1,38 +1,40 @@
 package com.sherlook.search.indexer;
 
-import java.util.ArrayList;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class Tokenizer {
-  public List<String> tokenize(String text) {
-    if (text == null || text.isEmpty()) return new ArrayList<>();
 
-    List<String> tokens = new ArrayList<>();
-    String[] rawTokens = text.toLowerCase().split("\\W+");
+  private final Stemmer stemmer;
 
-    for (String token : rawTokens) if (!token.isEmpty()) tokens.add(token);
-
-    return tokens;
+  @Autowired
+  public Tokenizer(Stemmer stemmer) {
+    this.stemmer = stemmer;
   }
 
   public int tokenizeWithPositions(
       String text,
-      int startPosition,
+      int startPos,
       List<String> tokens,
+      List<String> stems,
       List<Integer> positions,
       List<Section> sections,
-      Section section) {
+      Section currentSection) {
 
-    int pos = startPosition;
-    List<String> newTokens = tokenize(text);
+    String[] words = text.toLowerCase().split("\\W+");
+    int pos = startPos;
 
-    for (String token : newTokens) {
-      tokens.add(token);
-      positions.add(pos);
-      sections.add(section);
-      pos++;
+    for (String word : words) {
+      if (!word.isEmpty()) {
+        tokens.add(word);
+
+        if (stems != null) stems.add(stemmer.stem(word));
+
+        positions.add(pos++);
+        sections.add(currentSection);
+      }
     }
 
     return pos;
