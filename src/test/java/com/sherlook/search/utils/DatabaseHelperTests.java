@@ -12,6 +12,7 @@ import com.sherlook.search.indexer.Section;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -209,6 +210,77 @@ class DatabaseHelperTests {
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM words WHERE word IN (?, ?)", Integer.class, "new1", "new2");
     assertEquals(2, count, "New words should be inserted in database");
+  }
+
+  @Test
+  void testGetOrCreateWordIdsWithStems() {
+    jdbcTemplate.update(
+        "INSERT INTO words (word, stem, count) VALUES (?, ?, ?)", "running", "run", 1);
+
+    List<String> wordsToCheck = Arrays.asList("running", "jumped", "swimming", "flies");
+    List<String> stems = Arrays.asList("run", "jump", "swim", "fli");
+
+    Map<String, Integer> wordIds = databaseHelper.getOrCreateWordIds(wordsToCheck, stems);
+
+    assertEquals(4, wordIds.size(), "Should return IDs for all words");
+
+    assertNotNull(wordIds.get("running"), "Should have ID for existing word");
+
+    List<Map<String, Object>> newWords =
+        jdbcTemplate.queryForList(
+            "SELECT word, stem FROM words WHERE word IN (?, ?, ?)", "jumped", "swimming", "flies");
+
+    assertEquals(3, newWords.size(), "Should have inserted 3 new words");
+
+    Map<String, String> wordToStemMap =
+        newWords.stream()
+            .collect(
+                Collectors.toMap(row -> (String) row.get("word"), row -> (String) row.get("stem")));
+
+    assertEquals("jump", wordToStemMap.get("jumped"), "jumped should stem to jump");
+    assertEquals("swim", wordToStemMap.get("swimming"), "swimming should stem to swim");
+    assertEquals("fli", wordToStemMap.get("flies"), "flies should stem to fli");
+  }
+
+  @Test
+  void testBatchInsertDocumentWordsWithStems() {
+    String url = TEST_URL_PREFIX + "batch-insert-stems";
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+
+    List<Map<String, Object>> results =
+        jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
+    int documentId = ((Number) results.get(0).get("id")).intValue();
+
+    List<String> words = Arrays.asList("running", "jumped", "swimming");
+    List<String> stems = Arrays.asList("run", "jump", "swim");
+    List<Integer> positions = Arrays.asList(0, 1, 2);
+    List<Section> sections = Arrays.asList(Section.TITLE, Section.HEADER, Section.BODY);
+
+    databaseHelper.batchInsertDocumentWords(documentId, words, stems, positions, sections);
+
+    List<Map<String, Object>> wordEntries =
+        jdbcTemplate.queryForList(
+            "SELECT w.word, w.stem, dw.position, dw.section FROM document_words dw "
+                + "JOIN words w ON dw.word_id = w.id "
+                + "WHERE dw.document_id = ? ORDER BY dw.position",
+            documentId);
+
+    assertEquals(3, wordEntries.size(), "Should have inserted all words");
+
+    assertEquals("running", wordEntries.get(0).get("word"));
+    assertEquals("run", wordEntries.get(0).get("stem"));
+    assertEquals(0, wordEntries.get(0).get("position"));
+    assertEquals(Section.TITLE.toString(), wordEntries.get(0).get("section"));
+
+    assertEquals("jumped", wordEntries.get(1).get("word"));
+    assertEquals("jump", wordEntries.get(1).get("stem"));
+    assertEquals(1, wordEntries.get(1).get("position"));
+    assertEquals(Section.HEADER.toString(), wordEntries.get(1).get("section"));
+
+    assertEquals("swimming", wordEntries.get(2).get("word"));
+    assertEquals("swim", wordEntries.get(2).get("stem"));
+    assertEquals(2, wordEntries.get(2).get("position"));
+    assertEquals(Section.BODY.toString(), wordEntries.get(2).get("section"));
   }
 
   @Test

@@ -64,16 +64,17 @@ public class IndexerTests {
       throws IOException {
     when(txManager.getTransaction(any(DefaultTransactionDefinition.class))).thenReturn(txStatus);
 
-    when(tokenizer.tokenizeWithPositions(anyString(), anyInt(), any(), any(), any(), any()))
+    when(tokenizer.tokenizeWithPositions(anyString(), anyInt(), any(), any(), any(), any(), any()))
         .thenAnswer(
             (Answer<Integer>)
                 invocation -> {
                   String text = invocation.getArgument(0);
                   int startPos = invocation.getArgument(1);
                   List<String> tokens = invocation.getArgument(2);
-                  List<Integer> positions = invocation.getArgument(3);
-                  List<Section> sections = invocation.getArgument(4);
-                  Section section = invocation.getArgument(5);
+                  List<String> stems = invocation.getArgument(3);
+                  List<Integer> positions = invocation.getArgument(4);
+                  List<Section> sections = invocation.getArgument(5);
+                  Section section = invocation.getArgument(6);
 
                   String[] words = text.toLowerCase().split("\\W+");
                   int pos = startPos;
@@ -81,6 +82,7 @@ public class IndexerTests {
                   for (String word : words) {
                     if (!word.isEmpty()) {
                       tokens.add(word);
+                      stems.add(word.length() > 1 ? word.substring(0, word.length() - 1) : word);
                       positions.add(pos++);
                       sections.add(section);
                     }
@@ -111,18 +113,29 @@ public class IndexerTests {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<String>> wordsCaptor = ArgumentCaptor.forClass(List.class);
     @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<String>> stemsCaptor = ArgumentCaptor.forClass(List.class);
+    @SuppressWarnings("unchecked")
     ArgumentCaptor<List<Integer>> posCaptor = ArgumentCaptor.forClass(List.class);
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<Section>> secCaptor = ArgumentCaptor.forClass(List.class);
 
     verify(databaseHelper, atLeastOnce())
         .batchInsertDocumentWords(
-            eq(123), wordsCaptor.capture(), posCaptor.capture(), secCaptor.capture());
+            eq(123),
+            wordsCaptor.capture(),
+            stemsCaptor.capture(),
+            posCaptor.capture(),
+            secCaptor.capture());
 
     List<String> tokens = wordsCaptor.getValue();
     assertTrue(tokens.contains("test"));
     assertTrue(tokens.contains("document"));
     assertTrue(tokens.contains("content"));
+
+    List<String> stems = stemsCaptor.getValue();
+    assertTrue(stems.contains("tes"));
+    assertTrue(stems.contains("documen"));
+    assertTrue(stems.contains("conten"));
 
     List<Section> secs = secCaptor.getValue();
     assertTrue(secs.contains(Section.TITLE));
