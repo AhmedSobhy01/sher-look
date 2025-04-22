@@ -150,70 +150,7 @@ class DatabaseHelperTests {
   }
 
   @Test
-  void testBatchInsertDocumentWords() {
-    String url = TEST_URL_PREFIX + "batch-insert";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
-
-    List<Map<String, Object>> results =
-        jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
-    int documentId = ((Number) results.get(0).get("id")).intValue();
-
-    List<String> words = Arrays.asList("word1", "word2", "word3");
-    List<Integer> positions = Arrays.asList(0, 1, 2);
-    List<Section> sections = Arrays.asList(Section.TITLE, Section.HEADER, Section.BODY);
-
-    databaseHelper.batchInsertDocumentWords(documentId, words, positions, sections);
-
-    List<Map<String, Object>> wordEntries =
-        jdbcTemplate.queryForList(
-            "SELECT w.word, dw.position, dw.section FROM document_words dw "
-                + "JOIN words w ON dw.word_id = w.id "
-                + "WHERE dw.document_id = ? ORDER BY dw.position",
-            documentId);
-
-    assertEquals(3, wordEntries.size(), "Should have inserted all words");
-    assertEquals("word1", wordEntries.get(0).get("word"));
-    assertEquals(0, wordEntries.get(0).get("position"));
-    assertEquals(Section.TITLE.toString(), wordEntries.get(0).get("section"));
-
-    assertEquals("word2", wordEntries.get(1).get("word"));
-    assertEquals(1, wordEntries.get(1).get("position"));
-    assertEquals(Section.HEADER.toString(), wordEntries.get(1).get("section"));
-
-    assertEquals("word3", wordEntries.get(2).get("word"));
-    assertEquals(2, wordEntries.get(2).get("position"));
-    assertEquals(Section.BODY.toString(), wordEntries.get(2).get("section"));
-  }
-
-  @Test
   void testGetOrCreateWordIds() {
-    // Insert existing words
-    jdbcTemplate.update("INSERT INTO words (word) VALUES (?)", "existing1");
-    jdbcTemplate.update("INSERT INTO words (word) VALUES (?)", "existing2");
-
-    List<String> wordsToCheck = Arrays.asList("existing1", "existing2", "new1", "new2");
-
-    Map<String, Integer> wordIds = databaseHelper.getOrCreateWordIds(wordsToCheck);
-
-    assertEquals(4, wordIds.size(), "Should return IDs for all words");
-
-    // Check the existing words
-    assertNotNull(wordIds.get("existing1"), "Should have ID for existing1");
-    assertNotNull(wordIds.get("existing2"), "Should have ID for existing2");
-
-    // Check the new words
-    assertNotNull(wordIds.get("new1"), "Should have created ID for new1");
-    assertNotNull(wordIds.get("new2"), "Should have created ID for new2");
-
-    // Verify words are inserted in the db
-    int count =
-        jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM words WHERE word IN (?, ?)", Integer.class, "new1", "new2");
-    assertEquals(2, count, "New words should be inserted in database");
-  }
-
-  @Test
-  void testGetOrCreateWordIdsWithStems() {
     jdbcTemplate.update(
         "INSERT INTO words (word, stem, count) VALUES (?, ?, ?)", "running", "run", 1);
 
@@ -243,7 +180,7 @@ class DatabaseHelperTests {
   }
 
   @Test
-  void testBatchInsertDocumentWordsWithStems() {
+  void testBatchInsertDocumentWords() {
     String url = TEST_URL_PREFIX + "batch-insert-stems";
     databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
 
