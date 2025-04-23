@@ -25,7 +25,7 @@ public class RankedDocument {
     return title;
   }
 
-  public double getTfIdf() {
+  public double getScore() {
     return tfIdf;
   }
 }
