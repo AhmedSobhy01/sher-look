@@ -13,7 +13,7 @@ public class RankedDocument {
     this.tfIdf = tfIdf;
   }
 
-  public int getDocumentId() {
+  public int getDocId() {
     return documentId;
   }
 

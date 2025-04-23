@@ -1,77 +1,133 @@
 package com.sherlook.search.ranker;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import com.sherlook.search.utils.DatabaseHelper;
+import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class RankerTests {
+@ExtendWith(MockitoExtension.class)
+class RankerTest {
 
-  @Autowired private Ranker ranker;
+  @Mock private DatabaseHelper databaseHelper;
 
-  @Autowired private JdbcTemplate jdbcTemplate;
+  @InjectMocks private Ranker ranker;
+
+  private static final double DELTA = 1e-6;
 
   @BeforeEach
-  void setup() {
-    jdbcTemplate.execute("DELETE FROM document_words");
-    jdbcTemplate.execute("DELETE FROM documents");
-    jdbcTemplate.execute("DELETE FROM words");
+  @Test
+  void testGetDocumentRelevance_TypicalCase() {
+    // Arrange
+    List<String> queryTerms = Arrays.asList("machine", "learning");
+    when(databaseHelper.getTotalDocumentCount()).thenReturn(1000);
+    when(databaseHelper.getTermFrequencyAcrossDocuments(queryTerms))
+        .thenReturn(Map.of("machine", 50, "learning", 20));
 
-    jdbcTemplate.update(
-        "INSERT INTO words (id, word) VALUES (1, 'machine'), (2, 'learning'), (3, 'data')");
+    // Document 1: "machine" in title (2x), "learning" in body (1x)
+    // Document 2: "machine" in body (1x), "learning" in header (1x)
+    // Document 3: "machine" in body (1x), no "learning"
+    List<DocumentTerm> documentTerms =
+        Arrays.asList(
+            new DocumentTerm(
+                "machine",
+                1,
+                "https://example.com",
+                "AI Guide",
+                100,
+                Map.of("title", Arrays.asList(5, 10))),
+            new DocumentTerm(
+                "learning",
+                1,
+                "https://example.com",
+                "AI Guide",
+                100,
+                Map.of("body", Arrays.asList(11))),
+            new DocumentTerm(
+                "machine",
+                2,
+                "https://example2.com",
+                "Tech Blog",
+                50,
+                Map.of("body", Arrays.asList(3))),
+            new DocumentTerm(
+                "learning",
+                2,
+                "https://example2.com",
+                "Tech Blog",
+                50,
+                Map.of("header", Arrays.asList(4))),
+            new DocumentTerm(
+                "machine",
+                3,
+                "https://example3.com",
+                "ML Intro",
+                200,
+                Map.of("body", Arrays.asList(7))));
+    when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
-    jdbcTemplate.update(
-        "INSERT INTO documents (id, url, title, description, file_path, crawl_time) VALUES "
-            + "(1, 'http://example.com', 'Doc 1', 'description 1', 'path1', CURRENT_TIMESTAMP), "
-            + "(2, 'http://example2.com', 'Doc 2', 'description 2', 'path2', CURRENT_TIMESTAMP), "
-            + "(3, 'http://example3.com', 'Doc 3', 'description 3', 'path3', CURRENT_TIMESTAMP), "
-            + "(4, 'http://example4.com', 'Doc 4', 'description 4', 'path4', CURRENT_TIMESTAMP)");
+    // Act
+    List<RankedDocument> result = ranker.getDocumentRelevance(queryTerms, false);
 
-    jdbcTemplate.update(
-        "INSERT INTO document_words (document_id, word_id, position) VALUES "
-            +
-            // Doc 1: 'machine' (x2), 'learning' (x1)
-            "(1, 1, 1), (1, 1, 2), (1, 2, 3), "
-            +
-            // Doc 2: 'machine' (x1)
-            "(2, 1, 1), "
-            +
-            // Doc 3: 'learning' (x2), 'data' (x1)
-            "(3, 2, 1), (3, 2, 2), (3, 3, 3), "
-            +
-            // Doc 4: 'data' (x1) - no query words from "machine learning"
-            "(4, 3, 1)");
+    // Assert
+    assertEquals(3, result.size(), "Should return three documents");
+
+    // Calculate expected TF-IDF scores
+    // IDF calculations:
+    // idf(machine) = log10(1000 / (50 + 0.0001)) ≈ 1.30102999566
+    // idf(learning) = log10(1000 / (20 + 0.0001)) ≈ 1.69897000433
+
+    // Document 2:
+    // machine: TF = 1/50 = 0.02, weighted (body, 1.0) = 0.02 * 1.0 = 0.02
+    // learning: TF = 1/50 = 0.02, weighted (header, 1.5) = 0.02 * 1.5 = 0.03
+    // TF-IDF = (0.02 * 1.30102999566) + (0.03 * 1.69897000433) ≈ 0.0260205999 + 0.0509691001 ≈
+    // 0.0769897000
+    RankedDocument doc2 = result.get(0);
+    assertEquals(2, doc2.getDocId(), "Document 2 ID");
+    assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
+    assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
+    assertEquals(0.0769897000, doc2.getScore(), DELTA, "Document 2 TF-IDF score");
+
+    // Document 1:
+    // machine: TF = 2/100 = 0.02, weighted (title, 2.0) = 0.02 * 2.0 = 0.04
+    // learning: TF = 1/100 = 0.01, weighted (body, 1.0) = 0.01 * 1.0 = 0.01
+    // TF-IDF = (0.04 * 1.30102999566) + (0.01 * 1.69897000433) ≈ 0.0520411998 + 0.0169897000 ≈
+    // 0.0690308998
+    RankedDocument doc1 = result.get(1);
+    assertEquals(1, doc1.getDocId(), "Document 1 ID");
+    assertEquals("https://example.com", doc1.getUrl(), "Document 1 URL");
+    assertEquals("AI Guide", doc1.getTitle(), "Document 1 title");
+    assertEquals(0.0690308998, doc1.getScore(), DELTA, "Document 1 TF-IDF score");
+
+    // Document 3:
+    // machine: TF = 1/200 = 0.005, weighted (body, 1.0) = 0.005 * 1.0 = 0.005
+    // learning: not present, so 0
+    // TF-IDF = (0.005 * 1.30102999566) + 0 ≈ 0.0065051499783
+    RankedDocument doc3 = result.get(2);
+    assertEquals(3, doc3.getDocId(), "Document 3 ID");
+    assertEquals("https://example3.com", doc3.getUrl(), "Document 3 URL");
+    assertEquals("ML Intro", doc3.getTitle(), "Document 3 title");
+    assertEquals(0.0065051499783, doc3.getScore(), DELTA, "Document 3 TF-IDF score");
+
+    // Verify sorting (highest TF-IDF first)
+    assertTrue(
+        result.get(0).getScore() > result.get(1).getScore(),
+        "Document 2 should have higher TF-IDF than Document 1");
+    assertTrue(
+        result.get(1).getScore() > result.get(2).getScore(),
+        "Document 1 should have higher TF-IDF than Document 3");
+
+    result.forEach(
+        doc -> {
+          assertNotNull(doc.getUrl(), "URL should not be null");
+          assertNotNull(doc.getTitle(), "Title should not be null");
+          assertTrue(doc.getScore() >= 0, "TF-IDF should be non-negative");
+        });
   }
-  /*
-   @Test
-   void testGetRelevance() {
-     List<RankedDocument> result = ranker.getRelevance("Machine Learning");
-
-     // Expected results based on TF-IDF calculations
-     List<RankedDocument> expected =
-         List.of(
-             new RankedDocument(2, "http://example2.com", "Doc 2", 0.3010), // 'learning' frequent
-             new RankedDocument(
-                 1, "http://example.com", "Doc 1", 0.3010), // Both terms, 'machine' frequent
-             new RankedDocument(
-                 3, "http://example3.com", "Doc 3", 0.2006) // Only 'machine', low score
-             // doc 4 not relevant
-             );
-
-     assertEquals(expected.size(), result.size(), "Result size mismatch");
-
-     for (int i = 0; i < expected.size(); i++) {
-       RankedDocument exp = expected.get(i);
-       RankedDocument res = result.get(i);
-       assertEquals(exp.getDocumentId(), res.getDocumentId(), "Document ID mismatch at index " + i);
-       assertEquals(exp.getUrl(), res.getUrl(), "URL mismatch at index " + i);
-       assertEquals(exp.getTitle(), res.getTitle(), "Title mismatch at index " + i);
-       assertEquals(exp.getTfIdf(), res.getTfIdf(), 0.001, "TF-IDF mismatch at index " + i);
-     }
-   }
-
-  */
 }

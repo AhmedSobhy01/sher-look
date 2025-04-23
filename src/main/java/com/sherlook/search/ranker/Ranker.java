@@ -37,7 +37,7 @@ public class Ranker {
     for (String term : queryTerms) {
       int df = termFrequencies.getOrDefault(term, 0);
       double idf =
-          Math.log(
+          Math.log10(
               (double) totalDocumentCount
                   / (df + 0.0001)); // Add a small constant to avoid division by zero
       idfMap.put(term, idf);
