@@ -21,6 +21,7 @@ public class CrawlTask implements Runnable {
   private Set<String> visitedUrls;
   private final int maxDepth;
   private final int threadId;
+  private Set<String> visitedUrlsHashes;
 
   public CrawlTask(
       PersistentQueue urlQueue,
@@ -73,18 +74,21 @@ public class CrawlTask implements Runnable {
       }
 
       // Check if the URL is already crawled
+      // Check in memory first
       if (!visitedUrls.add(urlToCrawl)) {
         ConsoleColors.printInfo(crawlTaskString);
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
+      // Check in the database
       if (databaseHelper.isUrlCrawled(urlToCrawl)) {
         ConsoleColors.printInfo(crawlTaskString);
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
+      // Check if the URL is allowed to be crawled
       if (!Robots.isAllowed(urlToCrawl)) {
         ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Crawling not allowed by robots.txt: " + urlToCrawl);
@@ -100,6 +104,21 @@ public class CrawlTask implements Runnable {
         System.out.println("Page title: " + doc.title());
       } else {
         System.out.println("Failed to fetch page. Status code: " + conn.response().statusCode());
+      }
+
+      // Check if the document already exists
+      String hash = sha256(doc.html());
+
+      if (visitedUrlsHashes.contains(hash)) {
+        ConsoleColors.printWArning(crawlTaskString);
+        System.out.println("Document already crawled: " + urlToCrawl);
+        return true;
+      }
+
+      if(dbaseHelper.isHashExsists(hash)) {
+        ConsoleColors.printWArning(crawlTaskString);
+        System.out.println("Document already crawled: " + urlToCrawl);
+        return true;
       }
 
       List<String> links = new ArrayList<>();
@@ -164,5 +183,12 @@ public class CrawlTask implements Runnable {
       throw new Exception("Failed to get document ID for URL: " + urlToCrawl);
     }
     databaseHelper.insertLinks(documentId, uniqueChildrens);
+  }
+
+
+  private String sha256(String input) throws NoSuchAlgorithmException {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    byte[] hash = digest.digest(input.getBytes());
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
   }
 }
