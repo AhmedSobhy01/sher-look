@@ -32,13 +32,14 @@ public class DatabaseHelper {
   }
 
   @Transactional
-  public void insertDocument(String url, String title, String description, String filePath,String hash) {
+  public void insertDocument(
+      String url, String title, String description, String filePath, String hash) {
     String sql =
         """
         INSERT INTO documents (url, title, description, file_path, document_hash, crawl_time)
         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """;
-    jdbcTemplate.update(sql, url, title, description, filePath,hash);
+    jdbcTemplate.update(sql, url, title, description, filePath, hash);
   }
 
   @Transactional
@@ -67,7 +68,7 @@ public class DatabaseHelper {
   }
 
   @Transactional
-  public boolean isHashExsists(String hash){
+  public boolean isHashExsists(String hash) {
     String sql = "SELECT COUNT(*) FROM documents WHERE document_hash = ?";
     Integer count = jdbcTemplate.queryForObject(sql, Integer.class, hash);
     return count != null && count > 0;

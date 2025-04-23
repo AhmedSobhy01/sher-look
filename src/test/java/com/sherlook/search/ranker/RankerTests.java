@@ -28,11 +28,11 @@ class RankerTests {
         "INSERT INTO words (id, word) VALUES (1, 'machine'), (2, 'learning'), (3, 'data')");
 
     jdbcTemplate.update(
-        "INSERT INTO documents (id, url, title, description, file_path, crawl_time) VALUES "
-            + "(1, 'http://example.com', 'Doc 1', 'description 1', 'path1', CURRENT_TIMESTAMP), "
-            + "(2, 'http://example2.com', 'Doc 2', 'description 2', 'path2', CURRENT_TIMESTAMP), "
-            + "(3, 'http://example3.com', 'Doc 3', 'description 3', 'path3', CURRENT_TIMESTAMP), "
-            + "(4, 'http://example4.com', 'Doc 4', 'description 4', 'path4', CURRENT_TIMESTAMP)");
+        "INSERT INTO documents (id, url, title, description, file_path, document_hash, crawl_time) VALUES "
+            + "(1, 'http://example.com', 'Doc 1', 'description 1', 'path1', 'example-hash1', CURRENT_TIMESTAMP), "
+            + "(2, 'http://example2.com', 'Doc 2', 'description 2', 'path2', 'example-hash2', CURRENT_TIMESTAMP), "
+            + "(3, 'http://example3.com', 'Doc 3', 'description 3', 'path3', 'example-hash3', CURRENT_TIMESTAMP), "
+            + "(4, 'http://example4.com', 'Doc 4', 'description 4', 'path4', 'example-hash4', CURRENT_TIMESTAMP)");
 
     jdbcTemplate.update(
         "INSERT INTO document_words (document_id, word_id, position) VALUES "

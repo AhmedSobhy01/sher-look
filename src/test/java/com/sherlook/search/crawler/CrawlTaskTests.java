@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.sherlook.search.utils.DatabaseHelper;
+import com.sherlook.search.utils.Hash;
 import java.net.SocketTimeoutException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,7 +46,7 @@ class CrawlTaskTests {
     CrawlTask task = new CrawlTask(mockQueue, visited, 5, mockDatabase, mockHtmlSaver, 5, 0);
     task.run();
 
-    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
+    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any(), any());
     verify(mockHtmlSaver, never()).save(any(), any());
   }
 
@@ -66,7 +67,7 @@ class CrawlTaskTests {
     }
 
     verify(mockHtmlSaver, never()).save(any(), any());
-    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
+    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -79,12 +80,14 @@ class CrawlTaskTests {
     when(doc.title()).thenReturn("Example Title");
     when(doc.select("meta[name=description]")).thenReturn(mock(Elements.class));
     when(doc.select("a[href]")).thenReturn(new Elements());
+    when(doc.html()).thenReturn("<html>example</html>");
 
     when(mockQueue.poll(10, TimeUnit.SECONDS))
         .thenReturn(new UrlDepthPair("http://example.com", 0))
         .thenReturn(null);
     when(mockDatabase.isUrlCrawled("http://example.com")).thenReturn(false);
     when(mockHtmlSaver.getFilePath("http://example.com")).thenReturn(examplePath);
+    when(mockDatabase.isHashExsists("http://example.com")).thenReturn(false);
 
     // Static mocks must be closed after use
     try (MockedStatic<Robots> robotsMock = mockStatic(Robots.class);
@@ -107,7 +110,11 @@ class CrawlTaskTests {
     verify(mockHtmlSaver).save(eq("http://example.com"), any());
     verify(mockDatabase)
         .insertDocument(
-            eq("http://example.com"), eq("Example Title"), any(), eq(examplePath.toString()));
+            eq("http://example.com"),
+            eq("Example Title"),
+            any(),
+            eq(examplePath.toString()),
+            eq(Hash.sha256("<html>example</html>")));
   }
 
   @Test
@@ -136,6 +143,6 @@ class CrawlTaskTests {
 
     // assert it just returned cleanly:
     verify(mockHtmlSaver, never()).save(any(), any());
-    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any());
+    verify(mockDatabase, never()).insertDocument(any(), any(), any(), any(), any());
   }
 }

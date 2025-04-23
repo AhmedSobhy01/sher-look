@@ -34,6 +34,7 @@ class DatabaseHelperTests {
   private static final String TEST_TITLE = "Test Title";
   private static final String TEST_DESCRIPTION = "Test Description";
   private static final String TEST_FILE_PATH = "/path/to/test/file.pdf";
+  private static final String TEST_HASH = "test-hash";
 
   @BeforeEach
   void setUp() {
@@ -44,7 +45,7 @@ class DatabaseHelperTests {
   void testInsertDocument_WithAllFields_ShouldInsertSuccessfully() {
     String url = TEST_URL_PREFIX + "complete";
 
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT * FROM documents WHERE url = ?", url);
@@ -62,7 +63,7 @@ class DatabaseHelperTests {
   void testInsertDocument_WithNullDescription_ShouldInsertWithNullDescription() {
     String url = TEST_URL_PREFIX + "null-description";
 
-    databaseHelper.insertDocument(url, TEST_TITLE, null, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, null, TEST_FILE_PATH, TEST_HASH);
 
     Map<String, Object> document =
         jdbcTemplate.queryForMap("SELECT * FROM documents WHERE url = ?", url);
@@ -75,7 +76,7 @@ class DatabaseHelperTests {
   void testInsertDocument_WithNullTitle_ShouldInsertWithNullTitle() {
     String url = TEST_URL_PREFIX + "null-title";
 
-    databaseHelper.insertDocument(url, null, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, null, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     Map<String, Object> document =
         jdbcTemplate.queryForMap("SELECT * FROM documents WHERE url = ?", url);
@@ -86,14 +87,14 @@ class DatabaseHelperTests {
   @Test
   void testInsertDocument_WithDuplicateUrl_ShouldThrowException() {
     String url = TEST_URL_PREFIX + "duplicate";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     UncategorizedSQLException exception =
         assertThrows(
             UncategorizedSQLException.class,
             () ->
                 databaseHelper.insertDocument(
-                    url, "Another Title", "Another Description", TEST_FILE_PATH),
+                    url, "Another Title", "Another Description", TEST_FILE_PATH, TEST_HASH),
             "Should throw exception when inserting document with duplicate URL");
 
     String exceptionMessage = exception.getMessage().toLowerCase();
@@ -108,7 +109,7 @@ class DatabaseHelperTests {
   @Test
   void testCheckURLCrawled() {
     String url = TEST_URL_PREFIX + "check-crawled";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     boolean isCrawled = databaseHelper.isUrlCrawled(url);
     assertEquals(true, isCrawled, "URL should be marked as crawled");
@@ -121,8 +122,8 @@ class DatabaseHelperTests {
   void testGetCrawledPagesCount() {
     String url1 = TEST_URL_PREFIX + "count-1";
     String url2 = TEST_URL_PREFIX + "count-2";
-    databaseHelper.insertDocument(url1, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
-    databaseHelper.insertDocument(url2, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url1, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
+    databaseHelper.insertDocument(url2, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     int count = databaseHelper.getCrawledPagesCount();
     assertEquals(2, count, "Should return the correct number of crawled pages");
@@ -131,7 +132,7 @@ class DatabaseHelperTests {
   @Test
   void testUpdateDocumentMetadata() {
     String url = TEST_URL_PREFIX + "update-metadata";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
@@ -151,7 +152,7 @@ class DatabaseHelperTests {
   @Test
   void testBatchInsertDocumentWords() {
     String url = TEST_URL_PREFIX + "batch-insert";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
@@ -214,7 +215,7 @@ class DatabaseHelperTests {
   @Test
   void testGetUnindexedDocuments() {
     String url1 = TEST_URL_PREFIX + "indexed";
-    databaseHelper.insertDocument(url1, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url1, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url1);
     int documentId1 = ((Number) results.get(0).get("id")).intValue();
@@ -222,7 +223,7 @@ class DatabaseHelperTests {
 
     // Insert unindexed document
     String url2 = TEST_URL_PREFIX + "unindexed";
-    databaseHelper.insertDocument(url2, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url2, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Document> unindexedDocs = databaseHelper.getUnindexedDocuments();
 
@@ -234,7 +235,7 @@ class DatabaseHelperTests {
   @Test
   void testUpdateIndexTime() {
     String url = TEST_URL_PREFIX + "update-index-time";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
@@ -257,7 +258,7 @@ class DatabaseHelperTests {
   @Test
   void testUpdateIndexTimeWithSpecificTime() {
     String url = TEST_URL_PREFIX + "update-index-specific-time";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
@@ -277,7 +278,7 @@ class DatabaseHelperTests {
   @Test
   void testGetDocumentWordCount() {
     String url = TEST_URL_PREFIX + "word-count";
-    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(url, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     List<Map<String, Object>> results =
         jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", url);
@@ -297,7 +298,8 @@ class DatabaseHelperTests {
     assertEquals(5, wordCount, "Document should have 5 words");
 
     String emptyUrl = TEST_URL_PREFIX + "empty-doc";
-    databaseHelper.insertDocument(emptyUrl, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH);
+    databaseHelper.insertDocument(
+        emptyUrl, TEST_TITLE, TEST_DESCRIPTION, TEST_FILE_PATH, TEST_HASH);
 
     results = jdbcTemplate.queryForList("SELECT id FROM documents WHERE url = ?", emptyUrl);
     int emptyDocId = ((Number) results.get(0).get("id")).intValue();

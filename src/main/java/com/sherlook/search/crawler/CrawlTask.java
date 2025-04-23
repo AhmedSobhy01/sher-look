@@ -2,10 +2,12 @@ package com.sherlook.search.crawler;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
+import com.sherlook.search.utils.Hash;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -38,6 +40,7 @@ public class CrawlTask implements Runnable {
     this.visitedUrls = visitedUrls;
     this.maxDepth = maxDepth;
     this.threadId = threadId;
+    this.visitedUrlsHashes = ConcurrentHashMap.newKeySet();
   }
 
   public void run() {
@@ -107,16 +110,16 @@ public class CrawlTask implements Runnable {
       }
 
       // Check if the document already exists
-      String hash = sha256(doc.html());
+      String hash = Hash.sha256(doc.html());
 
-      if (visitedUrlsHashes.contains(hash)) {
-        ConsoleColors.printWArning(crawlTaskString);
+      if (!visitedUrlsHashes.add(hash)) {
+        ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Document already crawled: " + urlToCrawl);
         return true;
       }
 
-      if(dbaseHelper.isHashExsists(hash)) {
-        ConsoleColors.printWArning(crawlTaskString);
+      if (databaseHelper.isHashExsists(hash)) {
+        ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Document already crawled: " + urlToCrawl);
         return true;
       }
@@ -143,7 +146,7 @@ public class CrawlTask implements Runnable {
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
       List<String> uniqueChildrens = links.stream().distinct().toList();
-      saveDocumentWithLinks(urlToCrawl, title, description, uniqueChildrens);
+      saveDocumentWithLinks(urlToCrawl, title, description, hash, uniqueChildrens);
       ConsoleColors.printSuccess(crawlTaskString);
       System.out.println("Saved page to database: " + urlToCrawl);
 
@@ -174,21 +177,18 @@ public class CrawlTask implements Runnable {
 
   @Transactional
   public void saveDocumentWithLinks(
-      String urlToCrawl, String title, String description, List<String> uniqueChildrens)
+      String urlToCrawl,
+      String title,
+      String description,
+      String hash,
+      List<String> uniqueChildrens)
       throws Exception {
     databaseHelper.insertDocument(
-        urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
+        urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString(), hash);
     int documentId = databaseHelper.getDocumentId(urlToCrawl);
     if (documentId == -1) {
       throw new Exception("Failed to get document ID for URL: " + urlToCrawl);
     }
     databaseHelper.insertLinks(documentId, uniqueChildrens);
-  }
-
-
-  private String sha256(String input) throws NoSuchAlgorithmException {
-    MessageDigest digest = MessageDigest.getInstance("SHA-256");
-    byte[] hash = digest.digest(input.getBytes());
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
   }
 }
