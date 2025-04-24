@@ -108,7 +108,6 @@ public class Ranker {
     Map<Integer, Double> pageRankPrevious = new HashMap<>();
     Map<Integer, Double> pageRankCurrent = new HashMap<>();
     int N = docIds.size();
-    int i = 0;
 
     for (int docId : docIds) {
       pageRankPrevious.put(docId, 1.0 / docIds.size()); // assuming uniform distribution
@@ -116,15 +115,15 @@ public class Ranker {
     }
 
     boolean converged = false;
-    for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-      i++;
+    for (int i = 0; i < MAX_ITERATIONS; ++i) {
       double S = 0.0;
-      double maxDiff = 0.0;
       for (int danglingNode : graph.danglingNodes) {
-        S += pageRankPrevious.get(danglingNode);
+        S += pageRankPrevious.getOrDefault(danglingNode, 0.0);
       }
-      double danglingContribution =
-          S / docIds.size(); // dangling nodes contribute equally to all nodes
+      // uniform dangling contribution
+      double danglingContribution = S / N;
+
+
       for (int docId : docIds) {
         double incomingSum = 0.0;
         for (int source : graph.incomingLinks.get(docId)) {
@@ -137,26 +136,43 @@ public class Ranker {
             (1 - DAMPING_FACTOR_PAGE_RANK) / N
                 + DAMPING_FACTOR_PAGE_RANK * (incomingSum + danglingContribution);
         pageRankCurrent.put(docId, newRank);
-        maxDiff = Math.max(maxDiff, Math.abs(newRank - pageRankPrevious.get(docId)));
       }
+
+
+      // Normalize current scores to sum to 1
+      double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
+      if(sum > 0){
+        for (int docId : docIds) {
+          pageRankCurrent.put(docId, pageRankCurrent.get(docId) / sum);
+        }
+      }
+
+      double maxDiff = 0.0;
+      for (int docId : docIds) {
+        double diff = Math.abs(pageRankCurrent.get(docId) - pageRankPrevious.get(docId));
+        maxDiff = Math.max(maxDiff, diff);
+      }
+
+      //check convergence
       if (maxDiff < CONVERGENCE_THRESHOLD) {
         ConsoleColors.printSuccess(
-            "PageRank converged after " + i + " iterations" + " with max diff: " + maxDiff);
+            "PageRank converged after " + (i + 1) + " iterations" + " with max diff: " + maxDiff);
         converged = true;
         break;
       }
       pageRankPrevious = pageRankCurrent;
       pageRankCurrent = new HashMap<>();
     }
+
     if (!converged) {
       System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
-    double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
+
+    System.out.println("Scores");
     for (int docId : docIds) {
-      pageRankCurrent.put(
-          docId, pageRankCurrent.get(docId) / sum); // normalize in case they don't sum to 1
+      System.out.println("Doc ID: " + docId + ", Score: " + pageRankPrevious.get(docId));
     }
-    return pageRankCurrent;
+    return pageRankPrevious;
   }
 
   /**

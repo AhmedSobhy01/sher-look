@@ -182,4 +182,53 @@ class RankerTest {
     // verifies the algorithm does not 'leak' scores to dangling nodes
     assertEquals(1.0, sum, 0.05, "Scores should sum to approximately 1");
   }
+
+  @Test
+  public void testComputePageRank_ComplexGraph() {
+    // Complex graph:
+    // 1 -> 2,3,4 (hub)
+    // 2 -> 3
+    // 3 -> 1,4 (authority)
+    // 4 -> none (dangling)
+    // 5 -> 1,3 (no incoming links)
+    List<Integer> docIds = Arrays.asList(1, 2, 3, 4, 5);
+    List<Link> links =
+        Arrays.asList(
+            new Link(1, 2),
+            new Link(1, 3),
+            new Link(1, 4),
+            new Link(2, 3),
+            new Link(3, 1),
+            new Link(3, 4),
+            new Link(5, 1),
+            new Link(5, 3));
+
+    Map<Integer, Double> scores = ranker.computePageRank(docIds, links);
+
+    assertEquals(5, scores.size(), "Should have scores for all 5 documents");
+    for (Integer docId : docIds) {
+      assertTrue(scores.containsKey(docId), "Score for Doc " + docId + " missing");
+      assertNotNull(scores.get(docId), "Score for Doc " + docId + " is null");
+    }
+
+    // Expected converged scores (approximate, based on simulation)
+    double[] expectedScores = {0.2297, 0.1415, 0.2896, 0.2600, 0.0789};
+    int[] docIdsArray = {1, 2, 3, 4, 5};
+    double tolerance = 0.05;
+    for (int i = 0; i < docIdsArray.length; i++) {
+      assertEquals(
+          expectedScores[i],
+          scores.get(docIdsArray[i]),
+          tolerance,
+          "Score for Doc " + docIdsArray[i] + " incorrect");
+    }
+
+    assertTrue(scores.get(3) > scores.get(4), "Doc 3 (authority) should rank higher than Doc 4 (dangling)");
+    assertTrue(scores.get(4) > scores.get(1), "Doc 4 (dangling) should rank higher than Doc 1 (hub)");
+    assertTrue(scores.get(1) > scores.get(2), "Doc 1 (hub) should rank higher than Doc 2");
+    assertTrue(scores.get(2) > scores.get(5), "Doc 2 should rank higher than Doc 5");
+
+    double sum = scores.values().stream().mapToDouble(Double::doubleValue).sum();
+    assertEquals(1.0, sum, 0.05, "Scores should sum to approximately 1");
+  }
 }
