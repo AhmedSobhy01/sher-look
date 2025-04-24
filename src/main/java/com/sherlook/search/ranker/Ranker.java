@@ -3,8 +3,6 @@ package com.sherlook.search.ranker;
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
-
-import java.sql.SQLOutput;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,87 +79,91 @@ public class Ranker {
     return rankedDocs;
   }
 
-  private Graph buildGraph(List<Integer> docIds, List<Link> links){
-    Map<Integer, List<Integer>> outgoingLinks = new HashMap<>();
+  private Graph buildGraph(List<Integer> docIds, List<Link> links) {
     Map<Integer, List<Integer>> incomingLinks = new HashMap<>();
+    Map<Integer, Integer> outgoingLinkCount = new HashMap<>();
     Set<Integer> danglingNodes = new HashSet<>();
-    for(int docId : docIds){
-        outgoingLinks.put(docId, new ArrayList<>());
-        incomingLinks.put(docId, new ArrayList<>());
+    for (int docId : docIds) {
+      incomingLinks.put(docId, new ArrayList<>());
+      outgoingLinkCount.put(docId, 0);
     }
-    for(Link link : links){
+    for (Link link : links) {
       int source = link.getSourceId();
-        int target = link.getTargetId();
-        outgoingLinks.get(source).add(target);
-        incomingLinks.get(target).add(source);
+      int target = link.getTargetId();
+      outgoingLinkCount.put(source, outgoingLinkCount.get(source) + 1);
+      incomingLinks.get(target).add(source);
     }
 
-    for(int docId : docIds){
-        if(outgoingLinks.get(docId).isEmpty()){
-            danglingNodes.add(docId);
-        }
+    for (int docId : docIds) {
+      if (outgoingLinkCount.get(docId) == 0) {
+        danglingNodes.add(docId);
+      }
     }
 
-    return new Graph(outgoingLinks, incomingLinks, danglingNodes);
+    return new Graph(outgoingLinkCount, incomingLinks, danglingNodes);
   }
 
-  public Map<Integer, Double> computePageRank(List<Integer> docIds, List<Link> links){
+  public Map<Integer, Double> computePageRank(List<Integer> docIds, List<Link> links) {
     Graph graph = buildGraph(docIds, links);
     Map<Integer, Double> pageRankPrevious = new HashMap<>();
     Map<Integer, Double> pageRankCurrent = new HashMap<>();
     int N = docIds.size();
     int i = 0;
 
-    for(int docId : docIds){
-        pageRankPrevious.put(docId, 1.0 / docIds.size()); // assuming uniform distribution
-        pageRankCurrent.put(docId, 0.0);
+    for (int docId : docIds) {
+      pageRankPrevious.put(docId, 1.0 / docIds.size()); // assuming uniform distribution
+      pageRankCurrent.put(docId, 0.0);
     }
 
     boolean converged = false;
-    for(int iteration = 0; iteration < MAX_ITERATIONS; iteration++){
+    for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       i++;
       double S = 0.0;
       double maxDiff = 0.0;
-      for(int danglingNode : graph.danglingNodes){
-          S += pageRankPrevious.get(danglingNode);
+      for (int danglingNode : graph.danglingNodes) {
+        S += pageRankPrevious.get(danglingNode);
       }
-      double danglingContribution = S / docIds.size(); //dangling nodes contribute equally to all nodes
-      for(int docId : docIds){
+      double danglingContribution =
+          S / docIds.size(); // dangling nodes contribute equally to all nodes
+      for (int docId : docIds) {
         double incomingSum = 0.0;
-        for(int source : graph.incomingLinks.get(docId)){
-            int outDegree = graph.outgoingLinks.get(source).size();
-            if(outDegree > 0){
-                incomingSum += pageRankPrevious.get(source) / outDegree;
-            }
+        for (int source : graph.incomingLinks.get(docId)) {
+          int outDegree = graph.outgoingLinkCount.get(source);
+          if (outDegree > 0) {
+            incomingSum += pageRankPrevious.get(source) / outDegree;
+          }
         }
-        double newRank = (1 - DAMPING_FACTOR_PAGE_RANK) / N
+        double newRank =
+            (1 - DAMPING_FACTOR_PAGE_RANK) / N
                 + DAMPING_FACTOR_PAGE_RANK * (incomingSum + danglingContribution);
         pageRankCurrent.put(docId, newRank);
         maxDiff = Math.max(maxDiff, Math.abs(newRank - pageRankPrevious.get(docId)));
       }
-        if(maxDiff < CONVERGENCE_THRESHOLD){
-          ConsoleColors.printSuccess("PageRank converged after " + i + " iterations" + " with max diff: " + maxDiff);
-            converged = true;
-            break;
-        }
+      if (maxDiff < CONVERGENCE_THRESHOLD) {
+        ConsoleColors.printSuccess(
+            "PageRank converged after " + i + " iterations" + " with max diff: " + maxDiff);
+        converged = true;
+        break;
+      }
       pageRankPrevious = pageRankCurrent;
       pageRankCurrent = new HashMap<>();
     }
-    if(!converged){
-        System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
+    if (!converged) {
+      System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
     double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
-    for(int docId : docIds){
-        pageRankCurrent.put(docId, pageRankCurrent.get(docId) / sum); // normalize in case they don't sum to 1
+    for (int docId : docIds) {
+      pageRankCurrent.put(
+          docId, pageRankCurrent.get(docId) / sum); // normalize in case they don't sum to 1
     }
     return pageRankCurrent;
   }
 
   /**
-   * This method is to be called directly after crawling, and parallel to indexing.
-   * It computes and updates the page rank score of all documents in the database.
+   * This method is to be called directly after crawling, and parallel to indexing. It computes and
+   * updates the page rank score of all documents in the database.
    */
-  public void rankPagesByPopularity(){
+  public void rankPagesByPopularity() {
     System.out.println("Started ranking pages by popularity");
     List<Integer> docIds = databaseHelper.getAllDocumentIds();
     List<Link> links = databaseHelper.getLinks();

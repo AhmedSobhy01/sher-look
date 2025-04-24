@@ -6,11 +6,10 @@ import com.sherlook.search.indexer.Section;
 import com.sherlook.search.indexer.Word;
 import com.sherlook.search.ranker.DocumentTerm;
 import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
+import com.sherlook.search.ranker.Link;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import com.sherlook.search.ranker.Link;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -316,11 +315,12 @@ public class DatabaseHelper {
     return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM documents", Integer.class);
   }
 
-  public List<Link> getLinks(){
+  public List<Link> getLinks() {
     List<Link> links = new ArrayList<>();
-    String sql = "SELECT l.source_document_id, d.document_id as target_document_id"
-        + " FROM links l"
-        + " JOIN documents d ON l.target_url = d.url";
+    String sql =
+        "SELECT l.source_document_id, d.document_id as target_document_id"
+            + " FROM links l"
+            + " JOIN documents d ON l.target_url = d.url";
     jdbcTemplate.query(
         sql,
         (rs, rowNum) -> {
@@ -332,7 +332,7 @@ public class DatabaseHelper {
     return links;
   }
 
-  public List<Integer> getAllDocumentIds(){
+  public List<Integer> getAllDocumentIds() {
     String sql = "SELECT id FROM documents";
     List<Integer> docIds = new ArrayList<>();
     jdbcTemplate.query(
@@ -345,7 +345,7 @@ public class DatabaseHelper {
     return docIds;
   }
 
-  public void batchUpdatePageRank(Map<Integer, Double>pageRank){
+  public void batchUpdatePageRank(Map<Integer, Double> pageRank) {
     String sql = "UPDATE documents SET page_rank = ? WHERE id = ?";
     jdbcTemplate.batchUpdate(
         sql,
@@ -356,5 +356,4 @@ public class DatabaseHelper {
           ps.setInt(2, entry.getKey());
         });
   }
-
 }

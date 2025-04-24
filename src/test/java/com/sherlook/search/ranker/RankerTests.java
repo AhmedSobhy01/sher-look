@@ -131,21 +131,22 @@ class RankerTest {
         });
   }
 
-  //pagerank tests
+  // pagerank tests
   @Test
   public void testComputePageRank_SimpleGraph() {
     // 3 documents, simple link structure
     // Doc 1 -> Doc 2, Doc 2 -> Doc 3, Doc 3 -> Doc 1 , should result in 1/3 in a single iteration
     List<Integer> docIds = Arrays.asList(1, 2, 3);
-    List<Link> links = Arrays.asList(
+    List<Link> links =
+        Arrays.asList(
             new Link(1, 2), // Doc 1 links to Doc 2
             new Link(2, 3), // Doc 2 links to Doc 3
-            new Link(3, 1)  // Doc 3 links to Doc 1
-    );
+            new Link(3, 1) // Doc 3 links to Doc 1
+            );
 
     Map<Integer, Double> scores = ranker.computePageRank(docIds, links);
 
-    //Verify
+    // Verify
     assertEquals(3, scores.size(), "Should have scores for all 3 documents");
     assertTrue(scores.containsKey(1), "Score for Doc 1 missing");
     assertTrue(scores.containsKey(2), "Score for Doc 2 missing");
