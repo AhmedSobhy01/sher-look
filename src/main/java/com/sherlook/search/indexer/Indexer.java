@@ -67,25 +67,29 @@ public class Indexer {
 
       // Extract words from the document
       List<String> words = new ArrayList<>();
+      List<String> stems = new ArrayList<>();
       List<Integer> positions = new ArrayList<>();
       List<Section> sections = new ArrayList<>();
       int pos = 0;
 
       if (!title.isEmpty())
         pos =
-            tokenizer.tokenizeWithPositions(title, pos, words, positions, sections, Section.TITLE);
+            tokenizer.tokenizeWithPositions(
+                title, pos, words, stems, positions, sections, Section.TITLE);
 
       for (Element el : htmlDoc.select("* :not(script):not(style)")) {
         if (el.tagName().equals("title") || el.tagName().equals("meta") || el.ownText().isEmpty())
           continue;
 
         Section sec = el.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
-        pos = tokenizer.tokenizeWithPositions(el.text(), pos, words, positions, sections, sec);
+        pos =
+            tokenizer.tokenizeWithPositions(el.text(), pos, words, stems, positions, sections, sec);
       }
 
       // Insert words into the database
       if (!words.isEmpty()) {
-        databaseHelper.batchInsertDocumentWords(document.getId(), words, positions, sections);
+        databaseHelper.batchInsertDocumentWords(
+            document.getId(), words, stems, positions, sections);
 
         ConsoleColors.printInfo("Indexer");
         System.out.println(

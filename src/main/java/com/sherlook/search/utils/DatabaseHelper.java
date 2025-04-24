@@ -150,15 +150,21 @@ public class DatabaseHelper {
     return count != null && count > 0;
   }
 
-  public Map<String, Integer> getOrCreateWordIds(List<String> words) {
+  public Map<String, Integer> getOrCreateWordIds(List<String> words, List<String> stems) {
     Map<String, Integer> wordIds = new HashMap<>();
-    if (words.isEmpty()) return wordIds;
+    if (words.isEmpty() || words.size() != stems.size()) return wordIds;
 
     Set<String> uniqueWords = new HashSet<>(words);
 
     // Count of each word
     Map<String, Integer> wordCounts = new HashMap<>();
-    for (String word : words) wordCounts.put(word, wordCounts.getOrDefault(word, 0) + 1);
+    Map<String, String> wordToStem = new HashMap<>();
+    for (int i = 0; i < words.size(); i++) {
+      String word = words.get(i);
+      String stem = stems.get(i);
+      wordCounts.put(word, wordCounts.getOrDefault(word, 0) + 1);
+      wordToStem.put(word, stem);
+    }
 
     // Get existing words
     List<Map<String, Object>> existingWords = Collections.emptyList();
@@ -183,9 +189,10 @@ public class DatabaseHelper {
     // Insert new words
     if (!uniqueWords.isEmpty()) {
       List<Object[]> newWords = new ArrayList<>();
-      for (String word : uniqueWords) newWords.add(new Object[] {word, wordCounts.get(word)});
+      for (String word : uniqueWords)
+        newWords.add(new Object[] {word, wordToStem.get(word), wordCounts.get(word)});
 
-      jdbcTemplate.batchUpdate("INSERT INTO words (word, count) VALUES (?, ?)", newWords);
+      jdbcTemplate.batchUpdate("INSERT INTO words (word, stem, count) VALUES (?, ?, ?)", newWords);
 
       List<Map<String, Object>> insertedWords =
           jdbcTemplate.queryForList(
@@ -205,13 +212,23 @@ public class DatabaseHelper {
     return wordIds;
   }
 
-  public void batchInsertDocumentWords(
-      int documentId, List<String> words, List<Integer> positions, List<Section> sections) {
-    if (words.isEmpty() || words.size() != positions.size() || words.size() != sections.size()) {
-      return;
-    }
+  public Map<String, Integer> getOrCreateWordIds(List<String> words) {
+    List<String> stems = words.stream().map(String::toLowerCase).collect(Collectors.toList());
+    return getOrCreateWordIds(words, stems);
+  }
 
-    Map<String, Integer> wordIds = getOrCreateWordIds(words);
+  public void batchInsertDocumentWords(
+      int documentId,
+      List<String> words,
+      List<String> stems,
+      List<Integer> positions,
+      List<Section> sections) {
+    if (words.isEmpty()
+        || words.size() != positions.size()
+        || words.size() != sections.size()
+        || words.size() != stems.size()) return;
+
+    Map<String, Integer> wordIds = getOrCreateWordIds(words, stems);
 
     List<Object[]> batch = new ArrayList<>(words.size());
     for (int i = 0; i < words.size(); i++) {
@@ -433,5 +450,12 @@ public class DatabaseHelper {
       idfMap.put(word, idf);
     }
     return idfMap;
+  }
+
+  public void batchInsertDocumentWords(
+      int documentId, List<String> words, List<Integer> positions, List<Section> sections) {
+    List<String> stems = words.stream().map(String::toLowerCase).collect(Collectors.toList());
+
+    batchInsertDocumentWords(documentId, words, stems, positions, sections);
   }
 }
