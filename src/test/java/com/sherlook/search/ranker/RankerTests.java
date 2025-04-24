@@ -25,7 +25,7 @@ class RankerTests {
     jdbcTemplate.execute("DELETE FROM words");
 
     jdbcTemplate.update(
-        "INSERT INTO words (id, word) VALUES (1, 'machine'), (2, 'learning'), (3, 'data')");
+        "INSERT INTO words (id, word, stem) VALUES (1, 'machine', 'machine'), (2, 'learning', 'learn'), (3, 'data', 'data')");
 
     jdbcTemplate.update(
         "INSERT INTO documents (id, url, title, description, file_path, document_hash, crawl_time) VALUES "

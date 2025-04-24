@@ -1,6 +1,5 @@
-PRAGMA journal_mode=WAL;
+PRAGMA journal_mode = WAL;
 PRAGMA busy_timeout = 500;
-
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT UNIQUE,
@@ -14,6 +13,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS words (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     word TEXT NOT NULL UNIQUE,
+    stem TEXT NOT NULL,
     count INTEGER DEFAULT 0 NOT NULL
 );
 CREATE TABLE IF NOT EXISTS document_words (
@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS document_words (
     FOREIGN KEY(word_id) REFERENCES words(id),
     PRIMARY KEY(document_id, word_id, position)
 );
-
 CREATE TABLE IF NOT EXISTS links (
     source_document_id INTEGER,
     target_url TEXT NOT NULL,
