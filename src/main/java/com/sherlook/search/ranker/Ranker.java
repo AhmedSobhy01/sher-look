@@ -2,10 +2,8 @@ package com.sherlook.search.ranker;
 
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -18,6 +16,8 @@ public class Ranker {
   private static final Map<String, Double> SECTION_WEIGHTS =
       Map.of("title", 2.0, "header", 1.5, "body", 1.0);
   private static final double IDF_SMOOTHING_FACTOR = 0.0001;
+  private static final double DAMPING_FACTOR_PAGE_RANK = 0.85;
+  private static final double CONVERGENCE_THRESHOLD = 0.00001;
 
   @Autowired
   public Ranker(QueryProcessor queryProcessor, DatabaseHelper databaseHelper) {
@@ -76,6 +76,30 @@ public class Ranker {
 
     rankedDocs.sort((d1, d2) -> Double.compare(d2.getScore(), d1.getScore()));
     return rankedDocs;
+  }
+
+  private Graph buildGraph(List<Integer> docIds, List<Link> links){
+    Map<Integer, List<Integer>> outgoingLinks = new HashMap<>();
+    Map<Integer, List<Integer>> incomingLinks = new HashMap<>();
+    Set<Integer> danglingNodes = new HashSet<>();
+    for(int docId : docIds){
+        outgoingLinks.put(docId, new ArrayList<>());
+        incomingLinks.put(docId, new ArrayList<>());
+    }
+    for(Link link : links){
+      int source = link.getSourceId();
+        int target = link.getTargetId();
+        outgoingLinks.get(source).add(target);
+        incomingLinks.get(target).add(source);
+    }
+
+    for(int docId : docIds){
+        if(outgoingLinks.get(docId).isEmpty()){
+            danglingNodes.add(docId);
+        }
+    }
+
+    return new Graph(outgoingLinks, incomingLinks, danglingNodes);
   }
 
   public void rankDocuments() {

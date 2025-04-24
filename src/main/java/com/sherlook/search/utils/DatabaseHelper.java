@@ -9,6 +9,8 @@ import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import com.sherlook.search.ranker.Link;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -313,4 +315,34 @@ public class DatabaseHelper {
   public int getTotalDocumentCount() {
     return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM documents", Integer.class);
   }
+
+  public List<Link> getLinks(){
+    List<Link> links = new ArrayList<>();
+    String sql = "SELECT l.source_document_id, d.document_id as target_document_id"
+        + " FROM links l"
+        + " JOIN documents d ON l.target_url = d.url";
+    jdbcTemplate.query(
+        sql,
+        (rs, rowNum) -> {
+          int sourceDocumentId = rs.getInt("source_document_id");
+          int targetDocumentId = rs.getInt("target_document_id");
+          links.add(new Link(sourceDocumentId, targetDocumentId));
+          return null;
+        });
+    return links;
+  }
+
+  public List<Integer> getDocIds(){
+    String sql = "SELECT id FROM documents";
+    List<Integer> docIds = new ArrayList<>();
+    jdbcTemplate.query(
+        sql,
+        (rs, rowNum) -> {
+          int documentId = rs.getInt("id");
+          docIds.add(documentId);
+          return null;
+        });
+    return docIds;
+  }
+
 }
