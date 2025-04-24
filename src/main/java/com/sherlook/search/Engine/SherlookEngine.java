@@ -1,16 +1,11 @@
 package com.sherlook.search.Engine;
 
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class SherlookEngine {
-
-  public static void main(String[] args) {
-    SpringApplication.run(SherlookEngine.class, args);
-  }
 
   @Bean
   public CommandLineRunner commandLineRunner(SherlookEngineManager manager) {
