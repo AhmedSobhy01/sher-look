@@ -7,7 +7,9 @@ import com.sherlook.search.utils.DatabaseHelper;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.springframework.stereotype.Component;
 
+@Component
 public class SherlookEngineManager {
   private final DatabaseHelper databaseHelper;
   private final Ranker ranker;
