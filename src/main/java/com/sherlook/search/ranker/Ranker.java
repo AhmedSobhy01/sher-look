@@ -1,6 +1,5 @@
 package com.sherlook.search.ranker;
 
-import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
@@ -11,22 +10,23 @@ import org.springframework.stereotype.Component;
 @Component
 public class Ranker {
 
-  private QueryProcessor queryProcessor;
-  private DatabaseHelper databaseHelper;
+  private final DatabaseHelper databaseHelper;
+
   private static final Map<String, Double> SECTION_WEIGHTS =
       Map.of("title", 2.0, "header", 1.5, "body", 1.0);
   private static final double IDF_SMOOTHING_FACTOR = 0.0001;
   private static final double DAMPING_FACTOR_PAGE_RANK = 0.85;
   private static final double CONVERGENCE_THRESHOLD = 0.00001;
   private static final double MAX_ITERATIONS = 100;
+  private static final double TF_IDF_CONTRIBUTION = 0.7;
+  private static final double PAGE_RANK_CONTRIBUTION = 0.3;
 
   @Autowired
-  public Ranker(QueryProcessor queryProcessor, DatabaseHelper databaseHelper) {
-    this.queryProcessor = queryProcessor;
+  public Ranker(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
   }
 
-  public List<RankedDocument> getDocumentRelevance(
+  public List<RankedDocument> getDocumentTfIdf(
       List<String> queryTerms, Boolean isPhraseSearch) {
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
     Map<String, Integer> termFrequencies =
@@ -75,7 +75,6 @@ public class Ranker {
       rankedDocs.add(new RankedDocument(docId, firstTerm.getUrl(), firstTerm.getTitle(), tfIdfSum));
     }
 
-    rankedDocs.sort((d1, d2) -> Double.compare(d2.getScore(), d1.getScore()));
     return rankedDocs;
   }
 
@@ -189,7 +188,26 @@ public class Ranker {
     System.out.println("PageRank scores updated in the database");
   }
 
-  public void rankDocuments() {
-    System.out.println("Ranking documents...");
+  /**
+   * This method is the interface for the search engine to rank documents based on the query terms.
+   * It combines the TF-IDF score and PageRank score to produce a final ranking.
+   * @param queryTerms
+   * @param isPhraseSearch
+   * @return List of ranked documents
+   */
+  List<RankedDocument> rank(List<String> queryTerms, Boolean isPhraseSearch) {
+    List<RankedDocument> tfIdfDocs = getDocumentTfIdf(queryTerms, isPhraseSearch);
+    List<Integer> docIds =
+        tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
+    Map<Integer, Double> pageRankScores = databaseHelper.getPageRank(docIds);
+    for (RankedDocument doc : tfIdfDocs) {
+      double tfIdfScore = doc.getTfIdf();
+      double pageRankScore = pageRankScores.getOrDefault(doc.getDocId(), 0.0);
+      double finalScore =
+          TF_IDF_CONTRIBUTION * tfIdfScore + PAGE_RANK_CONTRIBUTION * pageRankScore;
+      doc.setFinalScore(finalScore);
+    }
+    tfIdfDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));
+    return tfIdfDocs;
   }
 }

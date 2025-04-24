@@ -356,4 +356,24 @@ public class DatabaseHelper {
           ps.setInt(2, entry.getKey());
         });
   }
+
+  public Map<Integer, Double> getPageRank(List<Integer> docIds){
+    String sql = "SELECT id, page_rank FROM documents WHERE id IN (" + String.join(",", Collections.nCopies(docIds.size(), "?")) + ")";
+    Map<Integer, Double> pageRankMap = new HashMap<>();
+    jdbcTemplate.query(
+        sql,
+        ps -> {
+          for (int i = 0; i < docIds.size(); i++) {
+            ps.setInt(i + 1, docIds.get(i));
+          }
+        },
+        rs -> {
+          while (rs.next()) {
+            int documentId = rs.getInt("id");
+            double pageRank = rs.getDouble("page_rank");
+            pageRankMap.put(documentId, pageRank);
+          }
+        });
+    return pageRankMap;
+  }
 }

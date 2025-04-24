@@ -73,7 +73,7 @@ class RankerTest {
     when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
     // Act
-    List<RankedDocument> result = ranker.getDocumentRelevance(queryTerms, false);
+    List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, false);
 
     // Assert
     assertEquals(3, result.size(), "Should return three documents");
@@ -92,7 +92,7 @@ class RankerTest {
     assertEquals(2, doc2.getDocId(), "Document 2 ID");
     assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
     assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
-    assertEquals(0.0769897000, doc2.getScore(), DELTA, "Document 2 TF-IDF score");
+    assertEquals(0.0769897000, doc2.getTfIdf(), DELTA, "Document 2 TF-IDF score");
 
     // Document 1:
     // machine: TF = 2/100 = 0.02, weighted (title, 2.0) = 0.02 * 2.0 = 0.04
@@ -103,7 +103,7 @@ class RankerTest {
     assertEquals(1, doc1.getDocId(), "Document 1 ID");
     assertEquals("https://example.com", doc1.getUrl(), "Document 1 URL");
     assertEquals("AI Guide", doc1.getTitle(), "Document 1 title");
-    assertEquals(0.0690308998, doc1.getScore(), DELTA, "Document 1 TF-IDF score");
+    assertEquals(0.0690308998, doc1.getTfIdf(), DELTA, "Document 1 TF-IDF score");
 
     // Document 3:
     // machine: TF = 1/200 = 0.005, weighted (body, 1.0) = 0.005 * 1.0 = 0.005
@@ -113,21 +113,21 @@ class RankerTest {
     assertEquals(3, doc3.getDocId(), "Document 3 ID");
     assertEquals("https://example3.com", doc3.getUrl(), "Document 3 URL");
     assertEquals("ML Intro", doc3.getTitle(), "Document 3 title");
-    assertEquals(0.0065051499783, doc3.getScore(), DELTA, "Document 3 TF-IDF score");
+    assertEquals(0.0065051499783, doc3.getTfIdf(), DELTA, "Document 3 TF-IDF score");
 
     // Verify sorting (highest TF-IDF first)
     assertTrue(
-        result.get(0).getScore() > result.get(1).getScore(),
+        result.get(0).getTfIdf() > result.get(1).getTfIdf(),
         "Document 2 should have higher TF-IDF than Document 1");
     assertTrue(
-        result.get(1).getScore() > result.get(2).getScore(),
+        result.get(1).getTfIdf() > result.get(2).getTfIdf(),
         "Document 1 should have higher TF-IDF than Document 3");
 
     result.forEach(
         doc -> {
           assertNotNull(doc.getUrl(), "URL should not be null");
           assertNotNull(doc.getTitle(), "Title should not be null");
-          assertTrue(doc.getScore() >= 0, "TF-IDF should be non-negative");
+          assertTrue(doc.getTfIdf() >= 0, "TF-IDF should be non-negative");
         });
   }
 

@@ -1,16 +1,18 @@
 package com.sherlook.search.ranker;
 
 public class RankedDocument {
-  private int documentId;
-  private String url;
-  private String title;
-  private double tfIdf;
+  private final int documentId;
+  private final String url;
+  private final String title;
+  private final double tfIdf;
+  private double finalScore = 0.0;
 
   public RankedDocument(int documentId, String url, String title, double tfIdf) {
     this.documentId = documentId;
     this.url = url;
     this.title = title;
     this.tfIdf = tfIdf;
+
   }
 
   public int getDocId() {
@@ -25,7 +27,15 @@ public class RankedDocument {
     return title;
   }
 
-  public double getScore() {
+  public double getTfIdf() {
     return tfIdf;
+  }
+
+  public double getFinalScore() {
+    return finalScore;
+  }
+
+  public void setFinalScore(double finalScore) {
+    this.finalScore = finalScore;
   }
 }
