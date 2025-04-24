@@ -9,7 +9,7 @@ public class DocumentTerm {
   private final int documentId;
   private final String url;
   private final String title;
-  private final int wordCountInDocument; // for tf
+  private final int document_size;
   private final Map<String, List<Integer>> positionsBySection;
 
   public DocumentTerm(
@@ -17,13 +17,13 @@ public class DocumentTerm {
       int documentId,
       String url,
       String title,
-      int wordCountInDocument,
+      int document_size,
       Map<String, List<Integer>> positionsBySection) {
     this.word = word;
     this.documentId = documentId;
     this.url = url;
     this.title = title;
-    this.wordCountInDocument = wordCountInDocument;
+    this.document_size = document_size;
     this.positionsBySection = positionsBySection;
   }
 
@@ -35,16 +35,16 @@ public class DocumentTerm {
     return documentId;
   }
 
+  public int getDocumentSize() {
+    return document_size;
+  }
+
   public String getUrl() {
     return url;
   }
 
   public String getTitle() {
     return title;
-  }
-
-  public int getWordCountInDocument() {
-    return wordCountInDocument;
   }
 
   public Map<String, List<Integer>> getPositionsBySection() {
@@ -57,25 +57,18 @@ public class DocumentTerm {
     private final int documentId;
     private final String url;
     private final String title;
-    private int wordCountInDocument;
+    private final int document_size;
     private final Map<String, List<Integer>> positionsBySection;
 
-    public DocumentTermBuilder(String word, int documentId, String url, String title) {
+    public DocumentTermBuilder(String word, int documentId, String url, String title, int document_size) {
       this.word = word;
       this.documentId = documentId;
       this.url = url;
       this.title = title;
-      this.wordCountInDocument = 0;
+      this.document_size = document_size;
       this.positionsBySection = new HashMap<String, List<Integer>>();
     }
 
-    public void setWordCountInDocument(int wordCountInDocument) {
-      this.wordCountInDocument = wordCountInDocument;
-    }
-
-    public int getWordCountInDocument() {
-      return wordCountInDocument;
-    }
 
     public void addPositions(String section, List<Integer> positions) {
       positionsBySection.put(section, positions);
@@ -83,7 +76,7 @@ public class DocumentTerm {
 
     public DocumentTerm build() {
       return new DocumentTerm(
-          word, documentId, url, title, wordCountInDocument, positionsBySection);
+          word, documentId, url, title, document_size, positionsBySection);
     }
   }
 }

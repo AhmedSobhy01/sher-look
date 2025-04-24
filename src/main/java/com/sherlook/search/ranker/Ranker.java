@@ -32,17 +32,8 @@ public class Ranker {
         databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
     int totalDocumentCount = databaseHelper.getTotalDocumentCount();
 
-    // compute idf
-    // this computation can be done once after indexing
-    Map<String, Double> idfMap = new HashMap<>();
-    for (String term : queryTerms) {
-      int df = termFrequencies.getOrDefault(term, 0);
-      double idf =
-          Math.log10(
-              (double) totalDocumentCount
-                  / (df + IDF_SMOOTHING_FACTOR)); // Add a small constant to avoid division by zero
-      idfMap.put(term, idf);
-    }
+    // get idf
+    Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
 
     // Group by doc id
     Map<Integer, List<DocumentTerm>> docGroups =
@@ -64,7 +55,7 @@ public class Ranker {
             dt.getPositionsBySection().entrySet()) {
           String section = sectionEntry.getKey();
           int frequency = sectionEntry.getValue().size();
-          double tf = (double) frequency / dt.getWordCountInDocument();
+          double tf = (double) frequency / dt.getDocumentSize();
           double weight = SECTION_WEIGHTS.getOrDefault(section, 1.0);
           weightedTf += tf * weight;
         }

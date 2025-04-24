@@ -25,106 +25,64 @@ class RankerTest {
   @BeforeEach
   @Test
   void testGetTfIdf_TypicalCase() {
-    // Arrange
     List<String> queryTerms = Arrays.asList("machine", "learning");
     when(databaseHelper.getTotalDocumentCount()).thenReturn(1000);
-    when(databaseHelper.getTermFrequencyAcrossDocuments(queryTerms))
-        .thenReturn(Map.of("machine", 50, "learning", 20));
 
-    // Document 1: "machine" in title (2x), "learning" in body (1x)
-    // Document 2: "machine" in body (1x), "learning" in header (1x)
-    // Document 3: "machine" in body (1x), no "learning"
-    List<DocumentTerm> documentTerms =
-        Arrays.asList(
-            new DocumentTerm(
-                "machine",
-                1,
-                "https://example.com",
-                "AI Guide",
-                100,
-                Map.of("title", Arrays.asList(5, 10))),
-            new DocumentTerm(
-                "learning",
-                1,
-                "https://example.com",
-                "AI Guide",
-                100,
-                Map.of("body", Arrays.asList(11))),
-            new DocumentTerm(
-                "machine",
-                2,
-                "https://example2.com",
-                "Tech Blog",
-                50,
-                Map.of("body", Arrays.asList(3))),
-            new DocumentTerm(
-                "learning",
-                2,
-                "https://example2.com",
-                "Tech Blog",
-                50,
-                Map.of("header", Arrays.asList(4))),
-            new DocumentTerm(
-                "machine",
-                3,
-                "https://example3.com",
-                "ML Intro",
-                200,
-                Map.of("body", Arrays.asList(7))));
+    Map<String, Double> mockIdfMap = Map.of(
+            "machine", Math.log(1000.0 / (50 + 1)),  // ≈ 2.976
+            "learning", Math.log(1000.0 / (20 + 1))  // ≈ 3.863
+    );
+    when(databaseHelper.getIDF(queryTerms)).thenReturn(mockIdfMap);
+
+    List<DocumentTerm> documentTerms = Arrays.asList(
+            new DocumentTerm("machine", 1, "https://example.com", "AI Guide", 100,
+                    Map.of("title", Arrays.asList(5, 10))), // 2x in title
+            new DocumentTerm("learning", 1, "https://example.com", "AI Guide", 100,
+                    Map.of("body", Arrays.asList(11))),      // 1x in body
+            new DocumentTerm("machine", 2, "https://example2.com", "Tech Blog", 50,
+                    Map.of("body", Arrays.asList(3))),       // 1x in body
+            new DocumentTerm("learning", 2, "https://example2.com", "Tech Blog", 50,
+                    Map.of("header", Arrays.asList(4))),     // 1x in header
+            new DocumentTerm("machine", 3, "https://example3.com", "ML Intro", 200,
+                    Map.of("body", Arrays.asList(7)))        // 1x in body
+    );
     when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
-    // Act
     List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, false);
 
-    // Assert
     assertEquals(3, result.size(), "Should return three documents");
+    Map<Integer, RankedDocument> docsById = result.stream()
+            .collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
 
-    // sorting is not done in this phase, map instead to check values
-    Map<Integer, RankedDocument> docsById =
-        result.stream().collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
-
-    // Calculate expected TF-IDF scores
-    // IDF calculations:
-    // idf(machine) = log10(1000 / (50 + 0.0001)) ≈ 1.30102999566
-    // idf(learning) = log10(1000 / (20 + 0.0001)) ≈ 1.69897000433
-
-    // Document 1:
-    // machine: TF = 2/100 = 0.02, weighted (title, 2.0) = 0.02 * 2.0 = 0.04
-    // learning: TF = 1/100 = 0.01, weighted (body, 1.0) = 0.01 * 1.0 = 0.01
-    // TF-IDF = (0.04 * 1.30102999566) + (0.01 * 1.69897000433) ≈ 0.0520411998 + 0.0169897000 ≈
-    // 0.0690308998
+    // Document 1 (docId=1)
     RankedDocument doc1 = docsById.get(1);
     assertEquals("https://example.com", doc1.getUrl(), "Document 1 URL");
     assertEquals("AI Guide", doc1.getTitle(), "Document 1 title");
-    assertEquals(0.0690308998, doc1.getTfIdf(), DELTA, "Document 1 TF-IDF score");
+    // TF-IDF calculation:
+    // "machine": TF = 2/100 = 0.02 → weighted (title ×2) → 0.02*2 = 0.04 → 0.04 * 2.976 ≈ 0.119
+    // "learning": TF = 1/100 = 0.01 → weighted (body ×1) → 0.01*1 = 0.01 → 0.01 * 3.863 ≈ 0.0386
+    // Total ≈ 0.119 + 0.0386 = 0.1576
+    assertEquals(0.1576, doc1.getTfIdf(), 0.001, "Document 1 TF-IDF score");
 
-    // Document 2:
-    // machine: TF = 1/50 = 0.02, weighted (body, 1.0) = 0.02 * 1.0 = 0.02
-    // learning: TF = 1/50 = 0.02, weighted (header, 1.5) = 0.02 * 1.5 = 0.03
-    // TF-IDF = (0.02 * 1.30102999566) + (0.03 * 1.69897000433) ≈ 0.0260205999 + 0.0509691001 ≈
-    // 0.0769897000
+    // Document 2 (docId=2)
     RankedDocument doc2 = docsById.get(2);
     assertNotNull(doc2, "Document 2 should be in results");
     assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
     assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
-    assertEquals(0.0769897000, doc2.getTfIdf(), DELTA, "Document 2 TF-IDF score");
+    // TF-IDF calculation:
+    // "machine": TF = 1/50 = 0.02 → weighted (body ×1) → 0.02*1 = 0.02 → 0.02 * 2.976 ≈ 0.0595
+    // "learning": TF = 1/50 = 0.02 → weighted (header ×1.5) → 0.02*1.5 = 0.03 → 0.03 * 3.863 ≈ 0.1159
+    // Total ≈ 0.0595 + 0.1159 = 0.1754
+    assertEquals(0.1754, doc2.getTfIdf(), 0.001, "Document 2 TF-IDF score");
 
-    // Document 3:
-    // machine: TF = 1/200 = 0.005, weighted (body, 1.0) = 0.005 * 1.0 = 0.005
-    // learning: not present, so 0
-    // TF-IDF = (0.005 * 1.30102999566) + 0 ≈ 0.0065051499783
+    // Document 3 (docId=3)
     RankedDocument doc3 = docsById.get(3);
     assertNotNull(doc3, "Document 3 should be in results");
     assertEquals("https://example3.com", doc3.getUrl(), "Document 3 URL");
     assertEquals("ML Intro", doc3.getTitle(), "Document 3 title");
-    assertEquals(0.0065051499783, doc3.getTfIdf(), DELTA, "Document 3 TF-IDF score");
-
-    result.forEach(
-        doc -> {
-          assertNotNull(doc.getUrl(), "URL should not be null");
-          assertNotNull(doc.getTitle(), "Title should not be null");
-          assertTrue(doc.getTfIdf() >= 0, "TF-IDF should be non-negative");
-        });
+    // TF-IDF calculation:
+    // "machine": TF = 1/200 = 0.005 → weighted (body ×1) → 0.005*1 = 0.005 → 0.005 * 2.976 ≈ 0.0149
+    assertEquals(0.0149, doc3.getTfIdf(), 0.001, "Document 3 TF-IDF score");
   }
 
   // pagerank tests

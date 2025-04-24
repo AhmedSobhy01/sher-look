@@ -233,7 +233,7 @@ public class DatabaseHelper {
 
     String placeholders = String.join(",", Collections.nCopies(queryTerms.size(), "?"));
     String sql =
-        "SELECT d.id AS document_id, d.url, d.title, w.word, w.id AS word_id, dw.section, "
+        "SELECT d.id AS document_id, d.url, d.title, w.word, w.id AS word_id, dw.section, d.document_size, "
             + "GROUP_CONCAT(dw.position) AS positions "
             + "FROM document_words dw "
             + "JOIN documents d ON dw.document_id = d.id "
@@ -258,6 +258,7 @@ public class DatabaseHelper {
           while (rs.next()) {
             int docId = rs.getInt("document_id");
             int wordId = rs.getInt("word_id");
+            int documentSize = rs.getInt("document_size");
             String section = rs.getString("section");
             String positionsString = rs.getString("positions");
 
@@ -272,7 +273,7 @@ public class DatabaseHelper {
                             rs.getString("word"),
                             docId,
                             rs.getString("url"),
-                            rs.getString("title"));
+                            rs.getString("title"),documentSize);
                       } catch (SQLException e) {
                         throw new RuntimeException(e);
                       }
@@ -284,7 +285,6 @@ public class DatabaseHelper {
                       .map(Integer::parseInt)
                       .collect(Collectors.toList());
               builder.addPositions(section, positions);
-              builder.setWordCountInDocument(builder.getWordCountInDocument() + positions.size());
             }
           }
 
@@ -378,5 +378,57 @@ public class DatabaseHelper {
           }
         });
     return pageRankMap;
+  }
+
+  public void populateDocumentSizes(){
+    String sql = "SELECT id, (SELECT COUNT(*) FROM document_words WHERE document_id = d.id) AS size FROM documents d";
+    List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+    jdbcTemplate.batchUpdate(
+            "UPDATE documents SET document_size = ? WHERE id = ?",
+            rows,
+            rows.size(),
+            (ps, row) -> {
+              ps.setInt(1, ((Number) row.get("size")).intValue());
+              ps.setInt(2, ((Number) row.get("id")).intValue());
+            });
+  }
+
+  public void populateIDF(){
+    int totalDocCount = getTotalDocumentCount();
+    if (totalDocCount == 0) return;
+
+    String sql = "SELECT w.id, COUNT(DISTINCT dw.document_id) as doc_frequency " +
+            "FROM words w " +
+            "JOIN document_words dw ON w.id = dw.word_id " +
+            "GROUP BY w.id";
+
+    List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+
+    jdbcTemplate.batchUpdate(
+            "UPDATE words SET idf = ? WHERE id = ?",
+            rows,
+            rows.size(),
+            (ps, row) -> {
+              int docFrequency = ((Number) row.get("doc_count")).intValue();
+              // Using natural logarithm for IDF
+              double idf = Math.log((double) totalDocCount / docFrequency + 1);
+              ps.setDouble(1, idf);
+              ps.setInt(2, ((Number) row.get("id")).intValue());
+            });
+  }
+
+  public Map<String, Double> getIDF(List<String> queryTerms) {
+    String sql =
+        "SELECT w.word, w.idf FROM words w WHERE w.word IN ("
+            + String.join(",", Collections.nCopies(queryTerms.size(), "?"))
+            + ")";
+    List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, queryTerms.toArray());
+    Map<String, Double> idfMap = new HashMap<>();
+    for (Map<String, Object> row : rows) {
+      String word = (String) row.get("word");
+      Double idf = ((Number) row.get("idf")).doubleValue();
+      idfMap.put(word, idf);
+    }
+    return idfMap;
   }
 }
