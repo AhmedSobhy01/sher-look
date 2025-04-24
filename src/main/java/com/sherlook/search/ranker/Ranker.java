@@ -17,6 +17,7 @@ public class Ranker {
   private DatabaseHelper databaseHelper;
   private static final Map<String, Double> SECTION_WEIGHTS =
       Map.of("title", 2.0, "header", 1.5, "body", 1.0);
+  private static final double IDF_SMOOTHING_FACTOR = 0.0001;
 
   @Autowired
   public Ranker(QueryProcessor queryProcessor, DatabaseHelper databaseHelper) {
@@ -39,7 +40,7 @@ public class Ranker {
       double idf =
           Math.log10(
               (double) totalDocumentCount
-                  / (df + 0.0001)); // Add a small constant to avoid division by zero
+                  / (df + IDF_SMOOTHING_FACTOR)); // Add a small constant to avoid division by zero
       idfMap.put(term, idf);
     }
 
