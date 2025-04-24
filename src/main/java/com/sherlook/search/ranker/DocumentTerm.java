@@ -1,6 +1,5 @@
 package com.sherlook.search.ranker;
 
-import com.sherlook.search.indexer.Word;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

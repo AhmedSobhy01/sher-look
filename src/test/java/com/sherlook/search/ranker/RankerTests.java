@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
 import java.util.stream.Collectors;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,15 +79,14 @@ class RankerTest {
     // Assert
     assertEquals(3, result.size(), "Should return three documents");
 
-    //sorting is not done in this phase, map instead to check values
-    Map<Integer, RankedDocument> docsById = result.stream()
-            .collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
+    // sorting is not done in this phase, map instead to check values
+    Map<Integer, RankedDocument> docsById =
+        result.stream().collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
 
     // Calculate expected TF-IDF scores
     // IDF calculations:
     // idf(machine) = log10(1000 / (50 + 0.0001)) ≈ 1.30102999566
     // idf(learning) = log10(1000 / (20 + 0.0001)) ≈ 1.69897000433
-
 
     // Document 1:
     // machine: TF = 2/100 = 0.02, weighted (title, 2.0) = 0.02 * 2.0 = 0.04
@@ -110,7 +108,6 @@ class RankerTest {
     assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
     assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
     assertEquals(0.0769897000, doc2.getTfIdf(), DELTA, "Document 2 TF-IDF score");
-
 
     // Document 3:
     // machine: TF = 1/200 = 0.005, weighted (body, 1.0) = 0.005 * 1.0 = 0.005
