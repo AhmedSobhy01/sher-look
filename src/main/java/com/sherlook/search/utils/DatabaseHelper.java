@@ -357,8 +357,11 @@ public class DatabaseHelper {
         });
   }
 
-  public Map<Integer, Double> getPageRank(List<Integer> docIds){
-    String sql = "SELECT id, page_rank FROM documents WHERE id IN (" + String.join(",", Collections.nCopies(docIds.size(), "?")) + ")";
+  public Map<Integer, Double> getPageRank(List<Integer> docIds) {
+    String sql =
+        "SELECT id, page_rank FROM documents WHERE id IN ("
+            + String.join(",", Collections.nCopies(docIds.size(), "?"))
+            + ")";
     Map<Integer, Double> pageRankMap = new HashMap<>();
     jdbcTemplate.query(
         sql,

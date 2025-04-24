@@ -12,7 +12,6 @@ public class RankedDocument {
     this.url = url;
     this.title = title;
     this.tfIdf = tfIdf;
-
   }
 
   public int getDocId() {

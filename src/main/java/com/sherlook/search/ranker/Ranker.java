@@ -26,8 +26,7 @@ public class Ranker {
     this.databaseHelper = databaseHelper;
   }
 
-  public List<RankedDocument> getDocumentTfIdf(
-      List<String> queryTerms, Boolean isPhraseSearch) {
+  public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, Boolean isPhraseSearch) {
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
     Map<String, Integer> termFrequencies =
         databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
@@ -122,7 +121,6 @@ public class Ranker {
       // uniform dangling contribution
       double danglingContribution = S / N;
 
-
       for (int docId : docIds) {
         double incomingSum = 0.0;
         for (int source : graph.incomingLinks.get(docId)) {
@@ -137,10 +135,9 @@ public class Ranker {
         pageRankCurrent.put(docId, newRank);
       }
 
-
       // Normalize current scores to sum to 1
       double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
-      if(sum > 0){
+      if (sum > 0) {
         for (int docId : docIds) {
           pageRankCurrent.put(docId, pageRankCurrent.get(docId) / sum);
         }
@@ -152,7 +149,7 @@ public class Ranker {
         maxDiff = Math.max(maxDiff, diff);
       }
 
-      //check convergence
+      // check convergence
       if (maxDiff < CONVERGENCE_THRESHOLD) {
         ConsoleColors.printSuccess(
             "PageRank converged after " + (i + 1) + " iterations" + " with max diff: " + maxDiff);
@@ -191,6 +188,7 @@ public class Ranker {
   /**
    * This method is the interface for the search engine to rank documents based on the query terms.
    * It combines the TF-IDF score and PageRank score to produce a final ranking.
+   *
    * @param queryTerms
    * @param isPhraseSearch
    * @return List of ranked documents
@@ -203,8 +201,7 @@ public class Ranker {
     for (RankedDocument doc : tfIdfDocs) {
       double tfIdfScore = doc.getTfIdf();
       double pageRankScore = pageRankScores.getOrDefault(doc.getDocId(), 0.0);
-      double finalScore =
-          TF_IDF_CONTRIBUTION * tfIdfScore + PAGE_RANK_CONTRIBUTION * pageRankScore;
+      double finalScore = TF_IDF_CONTRIBUTION * tfIdfScore + PAGE_RANK_CONTRIBUTION * pageRankScore;
       doc.setFinalScore(finalScore);
     }
     tfIdfDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));

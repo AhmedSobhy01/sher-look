@@ -223,8 +223,11 @@ class RankerTest {
           "Score for Doc " + docIdsArray[i] + " incorrect");
     }
 
-    assertTrue(scores.get(3) > scores.get(4), "Doc 3 (authority) should rank higher than Doc 4 (dangling)");
-    assertTrue(scores.get(4) > scores.get(1), "Doc 4 (dangling) should rank higher than Doc 1 (hub)");
+    assertTrue(
+        scores.get(3) > scores.get(4),
+        "Doc 3 (authority) should rank higher than Doc 4 (dangling)");
+    assertTrue(
+        scores.get(4) > scores.get(1), "Doc 4 (dangling) should rank higher than Doc 1 (hub)");
     assertTrue(scores.get(1) > scores.get(2), "Doc 1 (hub) should rank higher than Doc 2");
     assertTrue(scores.get(2) > scores.get(5), "Doc 2 should rank higher than Doc 5");
 
