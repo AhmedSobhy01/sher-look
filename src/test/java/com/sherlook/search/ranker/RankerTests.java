@@ -5,6 +5,8 @@ import static org.mockito.Mockito.*;
 
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
+import java.util.stream.Collectors;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +25,7 @@ class RankerTest {
 
   @BeforeEach
   @Test
-  void testGetDocumentRelevance_TypicalCase() {
+  void testGetTfIdf_TypicalCase() {
     // Arrange
     List<String> queryTerms = Arrays.asList("machine", "learning");
     when(databaseHelper.getTotalDocumentCount()).thenReturn(1000);
@@ -78,50 +80,47 @@ class RankerTest {
     // Assert
     assertEquals(3, result.size(), "Should return three documents");
 
+    //sorting is not done in this phase, map instead to check values
+    Map<Integer, RankedDocument> docsById = result.stream()
+            .collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
+
     // Calculate expected TF-IDF scores
     // IDF calculations:
     // idf(machine) = log10(1000 / (50 + 0.0001)) ≈ 1.30102999566
     // idf(learning) = log10(1000 / (20 + 0.0001)) ≈ 1.69897000433
 
-    // Document 2:
-    // machine: TF = 1/50 = 0.02, weighted (body, 1.0) = 0.02 * 1.0 = 0.02
-    // learning: TF = 1/50 = 0.02, weighted (header, 1.5) = 0.02 * 1.5 = 0.03
-    // TF-IDF = (0.02 * 1.30102999566) + (0.03 * 1.69897000433) ≈ 0.0260205999 + 0.0509691001 ≈
-    // 0.0769897000
-    RankedDocument doc2 = result.get(0);
-    assertEquals(2, doc2.getDocId(), "Document 2 ID");
-    assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
-    assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
-    assertEquals(0.0769897000, doc2.getTfIdf(), DELTA, "Document 2 TF-IDF score");
 
     // Document 1:
     // machine: TF = 2/100 = 0.02, weighted (title, 2.0) = 0.02 * 2.0 = 0.04
     // learning: TF = 1/100 = 0.01, weighted (body, 1.0) = 0.01 * 1.0 = 0.01
     // TF-IDF = (0.04 * 1.30102999566) + (0.01 * 1.69897000433) ≈ 0.0520411998 + 0.0169897000 ≈
     // 0.0690308998
-    RankedDocument doc1 = result.get(1);
-    assertEquals(1, doc1.getDocId(), "Document 1 ID");
+    RankedDocument doc1 = docsById.get(1);
     assertEquals("https://example.com", doc1.getUrl(), "Document 1 URL");
     assertEquals("AI Guide", doc1.getTitle(), "Document 1 title");
     assertEquals(0.0690308998, doc1.getTfIdf(), DELTA, "Document 1 TF-IDF score");
+
+    // Document 2:
+    // machine: TF = 1/50 = 0.02, weighted (body, 1.0) = 0.02 * 1.0 = 0.02
+    // learning: TF = 1/50 = 0.02, weighted (header, 1.5) = 0.02 * 1.5 = 0.03
+    // TF-IDF = (0.02 * 1.30102999566) + (0.03 * 1.69897000433) ≈ 0.0260205999 + 0.0509691001 ≈
+    // 0.0769897000
+    RankedDocument doc2 = docsById.get(2);
+    assertNotNull(doc2, "Document 2 should be in results");
+    assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
+    assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
+    assertEquals(0.0769897000, doc2.getTfIdf(), DELTA, "Document 2 TF-IDF score");
+
 
     // Document 3:
     // machine: TF = 1/200 = 0.005, weighted (body, 1.0) = 0.005 * 1.0 = 0.005
     // learning: not present, so 0
     // TF-IDF = (0.005 * 1.30102999566) + 0 ≈ 0.0065051499783
-    RankedDocument doc3 = result.get(2);
-    assertEquals(3, doc3.getDocId(), "Document 3 ID");
+    RankedDocument doc3 = docsById.get(3);
+    assertNotNull(doc3, "Document 3 should be in results");
     assertEquals("https://example3.com", doc3.getUrl(), "Document 3 URL");
     assertEquals("ML Intro", doc3.getTitle(), "Document 3 title");
     assertEquals(0.0065051499783, doc3.getTfIdf(), DELTA, "Document 3 TF-IDF score");
-
-    // Verify sorting (highest TF-IDF first)
-    assertTrue(
-        result.get(0).getTfIdf() > result.get(1).getTfIdf(),
-        "Document 2 should have higher TF-IDF than Document 1");
-    assertTrue(
-        result.get(1).getTfIdf() > result.get(2).getTfIdf(),
-        "Document 1 should have higher TF-IDF than Document 3");
 
     result.forEach(
         doc -> {

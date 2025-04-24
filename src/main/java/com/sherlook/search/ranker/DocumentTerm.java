@@ -61,8 +61,8 @@ public class DocumentTerm {
     private int wordCountInDocument;
     private final Map<String, List<Integer>> positionsBySection;
 
-    public DocumentTermBuilder(String Word, int documentId, String url, String title) {
-      this.word = Word;
+    public DocumentTermBuilder(String word, int documentId, String url, String title) {
+      this.word = word;
       this.documentId = documentId;
       this.url = url;
       this.title = title;

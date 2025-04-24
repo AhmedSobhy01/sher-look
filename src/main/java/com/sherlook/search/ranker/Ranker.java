@@ -105,7 +105,7 @@ public class Ranker {
     Graph graph = buildGraph(docIds, links);
     Map<Integer, Double> pageRankPrevious = new HashMap<>();
     Map<Integer, Double> pageRankCurrent = new HashMap<>();
-    int NumDocs = docIds.size();
+    int numDocs = docIds.size();
 
     for (int docId : docIds) {
       pageRankPrevious.put(docId, 1.0 / docIds.size()); // assuming uniform distribution
@@ -114,12 +114,12 @@ public class Ranker {
 
     boolean converged = false;
     for (int i = 0; i < MAX_ITERATIONS; ++i) {
-      double SumDanglingNodeRanks = 0.0;
+      double sumDanglingNodeRanks = 0.0;
       for (int danglingNode : graph.danglingNodes) {
-        SumDanglingNodeRanks += pageRankPrevious.getOrDefault(danglingNode, 0.0);
+        sumDanglingNodeRanks += pageRankPrevious.getOrDefault(danglingNode, 0.0);
       }
       // uniform dangling contribution
-      double danglingContribution = SumDanglingNodeRanks / NumDocs;
+      double danglingContribution = sumDanglingNodeRanks / numDocs;
 
       for (int docId : docIds) {
         double incomingSum = 0.0;
@@ -130,7 +130,7 @@ public class Ranker {
           }
         }
         double newRank =
-            (1 - DAMPING_FACTOR_PAGE_RANK) / NumDocs
+            (1 - DAMPING_FACTOR_PAGE_RANK) / numDocs
                 + DAMPING_FACTOR_PAGE_RANK * (incomingSum + danglingContribution);
         pageRankCurrent.put(docId, newRank);
       }
