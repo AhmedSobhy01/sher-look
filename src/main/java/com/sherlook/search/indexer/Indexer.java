@@ -130,7 +130,7 @@ public class Indexer {
       while (!docs.isEmpty()) {
         indexDocument(docs.poll());
       }
-      //batch update document_sizes after all documents are indexed
+      // batch update document_sizes after all documents are indexed
       databaseHelper.populateDocumentSizes();
       // precompute idf values
       databaseHelper.populateIDF();

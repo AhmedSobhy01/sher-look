@@ -60,7 +60,8 @@ public class DocumentTerm {
     private final int document_size;
     private final Map<String, List<Integer>> positionsBySection;
 
-    public DocumentTermBuilder(String word, int documentId, String url, String title, int document_size) {
+    public DocumentTermBuilder(
+        String word, int documentId, String url, String title, int document_size) {
       this.word = word;
       this.documentId = documentId;
       this.url = url;
@@ -69,14 +70,12 @@ public class DocumentTerm {
       this.positionsBySection = new HashMap<String, List<Integer>>();
     }
 
-
     public void addPositions(String section, List<Integer> positions) {
       positionsBySection.put(section, positions);
     }
 
     public DocumentTerm build() {
-      return new DocumentTerm(
-          word, documentId, url, title, document_size, positionsBySection);
+      return new DocumentTerm(word, documentId, url, title, document_size, positionsBySection);
     }
   }
 }

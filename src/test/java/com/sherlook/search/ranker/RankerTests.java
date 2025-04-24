@@ -28,31 +28,58 @@ class RankerTest {
     List<String> queryTerms = Arrays.asList("machine", "learning");
     when(databaseHelper.getTotalDocumentCount()).thenReturn(1000);
 
-    Map<String, Double> mockIdfMap = Map.of(
-            "machine", Math.log(1000.0 / (50 + 1)),  // ≈ 2.976
-            "learning", Math.log(1000.0 / (20 + 1))  // ≈ 3.863
-    );
+    Map<String, Double> mockIdfMap =
+        Map.of(
+            "machine", Math.log(1000.0 / (50 + 1)), // ≈ 2.976
+            "learning", Math.log(1000.0 / (20 + 1)) // ≈ 3.863
+            );
     when(databaseHelper.getIDF(queryTerms)).thenReturn(mockIdfMap);
 
-    List<DocumentTerm> documentTerms = Arrays.asList(
-            new DocumentTerm("machine", 1, "https://example.com", "AI Guide", 100,
-                    Map.of("title", Arrays.asList(5, 10))), // 2x in title
-            new DocumentTerm("learning", 1, "https://example.com", "AI Guide", 100,
-                    Map.of("body", Arrays.asList(11))),      // 1x in body
-            new DocumentTerm("machine", 2, "https://example2.com", "Tech Blog", 50,
-                    Map.of("body", Arrays.asList(3))),       // 1x in body
-            new DocumentTerm("learning", 2, "https://example2.com", "Tech Blog", 50,
-                    Map.of("header", Arrays.asList(4))),     // 1x in header
-            new DocumentTerm("machine", 3, "https://example3.com", "ML Intro", 200,
-                    Map.of("body", Arrays.asList(7)))        // 1x in body
-    );
+    List<DocumentTerm> documentTerms =
+        Arrays.asList(
+            new DocumentTerm(
+                "machine",
+                1,
+                "https://example.com",
+                "AI Guide",
+                100,
+                Map.of("title", Arrays.asList(5, 10))), // 2x in title
+            new DocumentTerm(
+                "learning",
+                1,
+                "https://example.com",
+                "AI Guide",
+                100,
+                Map.of("body", Arrays.asList(11))), // 1x in body
+            new DocumentTerm(
+                "machine",
+                2,
+                "https://example2.com",
+                "Tech Blog",
+                50,
+                Map.of("body", Arrays.asList(3))), // 1x in body
+            new DocumentTerm(
+                "learning",
+                2,
+                "https://example2.com",
+                "Tech Blog",
+                50,
+                Map.of("header", Arrays.asList(4))), // 1x in header
+            new DocumentTerm(
+                "machine",
+                3,
+                "https://example3.com",
+                "ML Intro",
+                200,
+                Map.of("body", Arrays.asList(7))) // 1x in body
+            );
     when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
     List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, false);
 
     assertEquals(3, result.size(), "Should return three documents");
-    Map<Integer, RankedDocument> docsById = result.stream()
-            .collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
+    Map<Integer, RankedDocument> docsById =
+        result.stream().collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
 
     // Document 1 (docId=1)
     RankedDocument doc1 = docsById.get(1);
@@ -71,7 +98,8 @@ class RankerTest {
     assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
     // TF-IDF calculation:
     // "machine": TF = 1/50 = 0.02 → weighted (body ×1) → 0.02*1 = 0.02 → 0.02 * 2.976 ≈ 0.0595
-    // "learning": TF = 1/50 = 0.02 → weighted (header ×1.5) → 0.02*1.5 = 0.03 → 0.03 * 3.863 ≈ 0.1159
+    // "learning": TF = 1/50 = 0.02 → weighted (header ×1.5) → 0.02*1.5 = 0.03 → 0.03 * 3.863 ≈
+    // 0.1159
     // Total ≈ 0.0595 + 0.1159 = 0.1754
     assertEquals(0.1754, doc2.getTfIdf(), 0.001, "Document 2 TF-IDF score");
 
