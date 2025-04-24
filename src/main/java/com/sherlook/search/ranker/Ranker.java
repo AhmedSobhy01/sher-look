@@ -151,6 +151,20 @@ public class Ranker {
     return pageRankCurrent;
   }
 
+  /**
+   * This method is to be called directly after crawling, and parallel to indexing.
+   * It computes and updates the page rank score of all documents in the database.
+   */
+  public void rankPagesByPopularity(){
+    System.out.println("Started ranking pages by popularity");
+    List<Integer> docIds = databaseHelper.getAllDocumentIds();
+    List<Link> links = databaseHelper.getLinks();
+    Map<Integer, Double> pageRankScores = computePageRank(docIds, links);
+    System.out.println("PageRank scores computed");
+    databaseHelper.batchUpdatePageRank(pageRankScores);
+    System.out.println("PageRank scores updated in the database");
+  }
+
   public void rankDocuments() {
     System.out.println("Ranking documents...");
   }

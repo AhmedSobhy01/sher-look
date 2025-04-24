@@ -332,7 +332,7 @@ public class DatabaseHelper {
     return links;
   }
 
-  public List<Integer> getDocIds(){
+  public List<Integer> getAllDocumentIds(){
     String sql = "SELECT id FROM documents";
     List<Integer> docIds = new ArrayList<>();
     jdbcTemplate.query(
