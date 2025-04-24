@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 public class DocumentTerm {
-  private final String Word;
-  private final int DocumentId;
+  private final String word;
+  private final int documentId;
   private final String url;
   private final String title;
   private final int wordCountInDocument; // for tf
@@ -20,8 +20,8 @@ public class DocumentTerm {
       String title,
       int wordCountInDocument,
       Map<String, List<Integer>> positionsBySection) {
-    this.Word = word;
-    this.DocumentId = documentId;
+    this.word = word;
+    this.documentId = documentId;
     this.url = url;
     this.title = title;
     this.wordCountInDocument = wordCountInDocument;
@@ -29,11 +29,11 @@ public class DocumentTerm {
   }
 
   public String getWord() {
-    return Word;
+    return word;
   }
 
   public int getDocumentId() {
-    return DocumentId;
+    return documentId;
   }
 
   public String getUrl() {
