@@ -3,6 +3,7 @@ package com.sherlook.search.ranker;
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.utils.DatabaseHelper;
 
+import java.sql.SQLOutput;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,6 +101,54 @@ public class Ranker {
     }
 
     return new Graph(outgoingLinks, incomingLinks, danglingNodes);
+  }
+
+  public Map<Integer, Double> computePageRank(List<Integer> docIds, List<Link> links){
+    Graph graph = buildGraph(docIds, links);
+    Map<Integer, Double> pageRankPrevious = new HashMap<>();
+    Map<Integer, Double> pageRankCurrent = new HashMap<>();
+    int N = docIds.size();
+    int i = 0;
+
+    for(int docId : docIds){
+        pageRankPrevious.put(docId, 1.0 / docIds.size()); // assuming uniform distribution
+        pageRankCurrent.put(docId, 0.0);
+    }
+
+    boolean converged = false;
+    while(converged == false){
+      i++;
+      double S = 0.0;
+      double maxDiff = 0.0;
+      for(int danglingNode : graph.danglingNodes){
+          S += pageRankPrevious.get(danglingNode);
+      }
+      double danglingContribution = S / docIds.size(); //dangling nodes contribute equally to all nodes
+      for(int docId : docIds){
+        double incomingSum = 0.0;
+        for(int source : graph.incomingLinks.get(docId)){
+            int outDegree = graph.outgoingLinks.get(source).size();
+            if(outDegree > 0){
+                incomingSum += pageRankPrevious.get(source) / outDegree;
+            }
+        }
+        double newRank = (1 - DAMPING_FACTOR_PAGE_RANK) / N
+                + DAMPING_FACTOR_PAGE_RANK * (incomingSum + danglingContribution);
+        pageRankCurrent.put(docId, newRank);
+        maxDiff = Math.max(maxDiff, Math.abs(newRank - pageRankPrevious.get(docId)));
+      }
+      pageRankPrevious = pageRankCurrent;
+        pageRankCurrent = new HashMap<>();
+        if(maxDiff < CONVERGENCE_THRESHOLD){
+          System.out.println("PageRank converged after" + i + " iterations" + " with max diff: " + maxDiff);
+            converged = true;
+        }
+    }
+    double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
+    for(int docId : docIds){
+        pageRankCurrent.put(docId, pageRankCurrent.get(docId) / sum); // normalize in case they don't sum to 1
+    }
+    return pageRankCurrent;
   }
 
   public void rankDocuments() {

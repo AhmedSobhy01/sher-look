@@ -345,4 +345,16 @@ public class DatabaseHelper {
     return docIds;
   }
 
+  public void batchUpdatePageRank(Map<Integer, Double>pageRank){
+    String sql = "UPDATE documents SET page_rank = ? WHERE id = ?";
+    jdbcTemplate.batchUpdate(
+        sql,
+        pageRank.entrySet(),
+        pageRank.size(),
+        (ps, entry) -> {
+          ps.setDouble(1, entry.getValue());
+          ps.setInt(2, entry.getKey());
+        });
+  }
+
 }
