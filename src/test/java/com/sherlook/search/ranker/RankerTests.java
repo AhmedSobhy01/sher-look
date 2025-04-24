@@ -130,4 +130,55 @@ class RankerTest {
           assertTrue(doc.getScore() >= 0, "TF-IDF should be non-negative");
         });
   }
+
+  //pagerank tests
+  @Test
+  public void testComputePageRank_SimpleGraph() {
+    // 3 documents, simple link structure
+    // Doc 1 -> Doc 2, Doc 2 -> Doc 3, Doc 3 -> Doc 1 , should result in 1/3 in a single iteration
+    List<Integer> docIds = Arrays.asList(1, 2, 3);
+    List<Link> links = Arrays.asList(
+            new Link(1, 2), // Doc 1 links to Doc 2
+            new Link(2, 3), // Doc 2 links to Doc 3
+            new Link(3, 1)  // Doc 3 links to Doc 1
+    );
+
+    Map<Integer, Double> scores = ranker.computePageRank(docIds, links);
+
+    //Verify
+    assertEquals(3, scores.size(), "Should have scores for all 3 documents");
+    assertTrue(scores.containsKey(1), "Score for Doc 1 missing");
+    assertTrue(scores.containsKey(2), "Score for Doc 2 missing");
+    assertTrue(scores.containsKey(3), "Score for Doc 3 missing");
+
+    // In a balanced cycle, scores should be approximately equal
+    double expectedScore = 1.0 / 3.0; // Idealized, assuming normalization
+    double tolerance = 0.05; // Allow for numerical precision
+    assertEquals(expectedScore, scores.get(1), tolerance, "Doc 1 score incorrect");
+    assertEquals(expectedScore, scores.get(2), tolerance, "Doc 2 score incorrect");
+    assertEquals(expectedScore, scores.get(3), tolerance, "Doc 3 score incorrect");
+
+    // Verify scores sum to ~1
+    double sum = scores.values().stream().mapToDouble(Double::doubleValue).sum();
+    assertEquals(1.0, sum, 0.05, "Scores should sum to approximately 1");
+  }
+
+  @Test
+  public void testComputePageRank_DanglingNode() {
+    List<Integer> docIds = Arrays.asList(1, 2);
+    List<Link> links = Arrays.asList(new Link(1, 2));
+
+    Map<Integer, Double> scores = ranker.computePageRank(docIds, links);
+
+    assertEquals(2, scores.size(), "Should have scores for both documents");
+    assertTrue(scores.containsKey(1), "Score for Doc 1 missing");
+    assertTrue(scores.containsKey(2), "Score for Doc 2 missing");
+    assertNotNull(scores.get(1), "Score for Doc 1 is null");
+    assertNotNull(scores.get(2), "Score for Doc 2 is null");
+    assertTrue(scores.get(2) > scores.get(1), "Doc 2 should have higher score than Doc 1");
+
+    double sum = scores.values().stream().mapToDouble(Double::doubleValue).sum();
+    // verifies the algorithm does not 'leak' scores to dangling nodes
+    assertEquals(1.0, sum, 0.05, "Scores should sum to approximately 1");
+  }
 }

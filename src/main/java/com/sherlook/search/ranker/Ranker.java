@@ -1,6 +1,7 @@
 package com.sherlook.search.ranker;
 
 import com.sherlook.search.query.QueryProcessor;
+import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 
 import java.sql.SQLOutput;
@@ -19,6 +20,7 @@ public class Ranker {
   private static final double IDF_SMOOTHING_FACTOR = 0.0001;
   private static final double DAMPING_FACTOR_PAGE_RANK = 0.85;
   private static final double CONVERGENCE_THRESHOLD = 0.00001;
+  private static final double MAX_ITERATIONS = 100;
 
   @Autowired
   public Ranker(QueryProcessor queryProcessor, DatabaseHelper databaseHelper) {
@@ -116,7 +118,7 @@ public class Ranker {
     }
 
     boolean converged = false;
-    while(converged == false){
+    for(int iteration = 0; iteration < MAX_ITERATIONS; iteration++){
       i++;
       double S = 0.0;
       double maxDiff = 0.0;
@@ -137,12 +139,16 @@ public class Ranker {
         pageRankCurrent.put(docId, newRank);
         maxDiff = Math.max(maxDiff, Math.abs(newRank - pageRankPrevious.get(docId)));
       }
-      pageRankPrevious = pageRankCurrent;
-        pageRankCurrent = new HashMap<>();
         if(maxDiff < CONVERGENCE_THRESHOLD){
-          System.out.println("PageRank converged after" + i + " iterations" + " with max diff: " + maxDiff);
+          ConsoleColors.printSuccess("PageRank converged after " + i + " iterations" + " with max diff: " + maxDiff);
             converged = true;
+            break;
         }
+      pageRankPrevious = pageRankCurrent;
+      pageRankCurrent = new HashMap<>();
+    }
+    if(!converged){
+        System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
     double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
     for(int docId : docIds){
