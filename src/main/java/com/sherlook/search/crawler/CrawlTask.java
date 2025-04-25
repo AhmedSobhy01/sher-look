@@ -100,7 +100,8 @@ public class CrawlTask implements Runnable {
 
       ConsoleColors.printInfo(crawlTaskString);
       System.out.println("Crawling URL: " + urlToCrawl);
-      Connection conn = Jsoup.connect(urlToCrawl).timeout(2000);
+      Connection conn = Jsoup.connect(urlToCrawl);
+      conn = conn.timeout(2000);
       Document doc = conn.get();
       if (conn.response().statusCode() == 200) {
         ConsoleColors.printSuccess(crawlTaskString);

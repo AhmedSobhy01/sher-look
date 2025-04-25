@@ -99,6 +99,7 @@ class CrawlTaskTests {
       // Stub Jsoup connection
       Connection connection = mock(Connection.class);
       when(connection.get()).thenReturn(doc);
+      when(connection.timeout(2000)).thenReturn(connection);
       Connection.Response response = mock(Connection.Response.class);
       when(response.statusCode()).thenReturn(200);
       when(connection.response()).thenReturn(response);
