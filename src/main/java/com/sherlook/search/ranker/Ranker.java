@@ -1,20 +1,25 @@
 package com.sherlook.search.ranker;
 
-import com.sherlook.search.utils.ConsoleColors;
-import com.sherlook.search.utils.DatabaseHelper;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import com.sherlook.search.utils.ConsoleColors;
+import com.sherlook.search.utils.DatabaseHelper;
 
 @Component
 public class Ranker {
 
   private final DatabaseHelper databaseHelper;
 
-  private static final Map<String, Double> SECTION_WEIGHTS =
-      Map.of("title", 2.0, "header", 1.5, "body", 1.0);
-  private static final double IDF_SMOOTHING_FACTOR = 0.0001;
+  private static final Map<String, Double> SECTION_WEIGHTS = Map.of("title", 2.0, "header", 1.5, "body", 1.0);
   private static final double DAMPING_FACTOR_PAGE_RANK = 0.85;
   private static final double CONVERGENCE_THRESHOLD = 0.00001;
   private static final double MAX_ITERATIONS = 100;
@@ -28,16 +33,13 @@ public class Ranker {
 
   public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, Boolean isPhraseSearch) {
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
-    Map<String, Integer> termFrequencies =
-        databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
-    int totalDocumentCount = databaseHelper.getTotalDocumentCount();
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
 
     // Group by doc id
-    Map<Integer, List<DocumentTerm>> docGroups =
-        documentTerms.stream().collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
+    Map<Integer, List<DocumentTerm>> docGroups = documentTerms.stream()
+        .collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
     List<RankedDocument> rankedDocs = new ArrayList<>();
 
     for (Map.Entry<Integer, List<DocumentTerm>> entry : docGroups.entrySet()) {
@@ -51,8 +53,7 @@ public class Ranker {
       double tfIdfSum = 0.0;
       for (DocumentTerm dt : terms) {
         double weightedTf = 0.0;
-        for (Map.Entry<String, List<Integer>> sectionEntry :
-            dt.getPositionsBySection().entrySet()) {
+        for (Map.Entry<String, List<Integer>> sectionEntry : dt.getPositionsBySection().entrySet()) {
           String section = sectionEntry.getKey();
           int frequency = sectionEntry.getValue().size();
           double tf = (double) frequency / dt.getDocumentSize();
@@ -120,9 +121,8 @@ public class Ranker {
             incomingSum += pageRankPrevious.get(source) / outDegree;
           }
         }
-        double newRank =
-            (1 - DAMPING_FACTOR_PAGE_RANK) / numDocs
-                + DAMPING_FACTOR_PAGE_RANK * (incomingSum + danglingContribution);
+        double newRank = (1 - DAMPING_FACTOR_PAGE_RANK) / numDocs
+            + DAMPING_FACTOR_PAGE_RANK * (incomingSum + danglingContribution);
         pageRankCurrent.put(docId, newRank);
       }
 
@@ -163,7 +163,8 @@ public class Ranker {
   }
 
   /**
-   * This method is to be called directly after crawling, and parallel to indexing. It computes and
+   * This method is to be called directly after crawling, and parallel to
+   * indexing. It computes and
    * updates the page rank score of all documents in the database.
    */
   public void rankPagesByPopularity() {
@@ -177,7 +178,8 @@ public class Ranker {
   }
 
   /**
-   * This method is the interface for the search engine to rank documents based on the query terms.
+   * This method is the interface for the search engine to rank documents based on
+   * the query terms.
    * It combines the TF-IDF score and PageRank score to produce a final ranking.
    *
    * @param queryTerms
@@ -186,8 +188,7 @@ public class Ranker {
    */
   List<RankedDocument> rank(List<String> queryTerms, Boolean isPhraseSearch) {
     List<RankedDocument> tfIdfDocs = getDocumentTfIdf(queryTerms, isPhraseSearch);
-    List<Integer> docIds =
-        tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
+    List<Integer> docIds = tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
     Map<Integer, Double> pageRankScores = databaseHelper.getPageRank(docIds);
     for (RankedDocument doc : tfIdfDocs) {
       double tfIdfScore = doc.getTfIdf();
