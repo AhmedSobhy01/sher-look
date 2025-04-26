@@ -144,7 +144,12 @@ public class Indexer {
       // Precompute IDF for ranker
       ConsoleColors.printInfo("Indexer");
       System.out.println("Calculating IDF for ranker...");
+
+      long startTime = System.currentTimeMillis();
       databaseHelper.calculateIDF();
+      ConsoleColors.printSuccess("Indexer");
+      System.out.println(
+          "IDF calculation completed in " + (System.currentTimeMillis() - startTime) + " ms");
 
       ConsoleColors.printSuccess("Indexer");
       System.out.println("All done!");
