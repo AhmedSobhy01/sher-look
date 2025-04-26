@@ -85,8 +85,10 @@ class RankerTests {
     assertEquals("https://example.com", doc1.getUrl(), "Document 1 URL");
     assertEquals("AI Guide", doc1.getTitle(), "Document 1 title");
     // TF-IDF calculation:
-    // "machine": TF = 2/100 = 0.02 → weighted (title ×2) → 0.02*2 = 0.04 → 0.04 * 2.976 ≈ 0.119
-    // "learning": TF = 1/100 = 0.01 → weighted (body ×1) → 0.01*1 = 0.01 → 0.01 * 3.863 ≈ 0.0386
+    // "machine": TF = 2/100 = 0.02 → weighted (title ×2) → 0.02*2 = 0.04 → 0.04 *
+    // 2.976 ≈ 0.119
+    // "learning": TF = 1/100 = 0.01 → weighted (body ×1) → 0.01*1 = 0.01 → 0.01 *
+    // 3.863 ≈ 0.0386
     // Total ≈ 0.119 + 0.0386 = 0.1576
     assertEquals(0.1576, doc1.getTfIdf(), 0.001, "Document 1 TF-IDF score");
 
@@ -96,8 +98,10 @@ class RankerTests {
     assertEquals("https://example2.com", doc2.getUrl(), "Document 2 URL");
     assertEquals("Tech Blog", doc2.getTitle(), "Document 2 title");
     // TF-IDF calculation:
-    // "machine": TF = 1/50 = 0.02 → weighted (body ×1) → 0.02*1 = 0.02 → 0.02 * 2.976 ≈ 0.0595
-    // "learning": TF = 1/50 = 0.02 → weighted (header ×1.5) → 0.02*1.5 = 0.03 → 0.03 * 3.863 ≈
+    // "machine": TF = 1/50 = 0.02 → weighted (body ×1) → 0.02*1 = 0.02 → 0.02 *
+    // 2.976 ≈ 0.0595
+    // "learning": TF = 1/50 = 0.02 → weighted (header ×1.5) → 0.02*1.5 = 0.03 →
+    // 0.03 * 3.863 ≈
     // 0.1159
     // Total ≈ 0.0595 + 0.1159 = 0.1754
     assertEquals(0.1754, doc2.getTfIdf(), 0.001, "Document 2 TF-IDF score");
@@ -108,7 +112,8 @@ class RankerTests {
     assertEquals("https://example3.com", doc3.getUrl(), "Document 3 URL");
     assertEquals("ML Intro", doc3.getTitle(), "Document 3 title");
     // TF-IDF calculation:
-    // "machine": TF = 1/200 = 0.005 → weighted (body ×1) → 0.005*1 = 0.005 → 0.005 * 2.976 ≈ 0.0149
+    // "machine": TF = 1/200 = 0.005 → weighted (body ×1) → 0.005*1 = 0.005 → 0.005
+    // * 2.976 ≈ 0.0149
     assertEquals(0.0149, doc3.getTfIdf(), 0.001, "Document 3 TF-IDF score");
   }
 
@@ -116,7 +121,8 @@ class RankerTests {
   @Test
   public void testComputePageRank_SimpleGraph() {
     // 3 documents, simple link structure
-    // Doc 1 -> Doc 2, Doc 2 -> Doc 3, Doc 3 -> Doc 1 , should result in 1/3 in a single iteration
+    // Doc 1 -> Doc 2, Doc 2 -> Doc 3, Doc 3 -> Doc 1 , should result in 1/3 in a
+    // single iteration
     List<Integer> docIds = Arrays.asList(1, 2, 3);
     List<Link> links =
         Arrays.asList(
