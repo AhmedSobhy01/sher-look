@@ -411,6 +411,7 @@ public class DatabaseHelper {
     jdbcTemplate.update(sql, size, documentId);
   }
 
+  @Transactional
   public void calculateIDF() {
     int totalDocCount = getTotalDocumentCount();
     if (totalDocCount == 0) return;
