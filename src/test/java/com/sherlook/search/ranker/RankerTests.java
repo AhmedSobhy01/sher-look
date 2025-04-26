@@ -1,12 +1,15 @@
 package com.sherlook.search.ranker;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,19 +17,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class RankerTest {
+class RankerTests {
 
   @Mock private DatabaseHelper databaseHelper;
 
   @InjectMocks private Ranker ranker;
 
-  private static final double DELTA = 1e-6;
-
-  @BeforeEach
   @Test
   void testGetTfIdf_TypicalCase() {
     List<String> queryTerms = Arrays.asList("machine", "learning");
-    when(databaseHelper.getTotalDocumentCount()).thenReturn(1000);
 
     Map<String, Double> mockIdfMap =
         Map.of(
