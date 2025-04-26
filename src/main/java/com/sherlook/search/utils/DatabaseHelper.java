@@ -8,7 +8,14 @@ import com.sherlook.search.ranker.DocumentTerm;
 import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
 import com.sherlook.search.ranker.Link;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -269,7 +276,8 @@ public class DatabaseHelper {
         },
         rs -> {
           Map<Pair<Integer, Integer>, DocumentTermBuilder> builders =
-              new HashMap<>(); // one builder per (docId, wordId)
+              new HashMap<>(); // one builder per (docId,
+          // wordId)
           List<DocumentTerm> result = new ArrayList<>();
 
           while (rs.next()) {
@@ -398,21 +406,12 @@ public class DatabaseHelper {
     return pageRankMap;
   }
 
-  public void populateDocumentSizes() {
-    String sql =
-        "SELECT id, (SELECT COUNT(*) FROM document_words WHERE document_id = d.id) AS size FROM documents d";
-    List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-    jdbcTemplate.batchUpdate(
-        "UPDATE documents SET document_size = ? WHERE id = ?",
-        rows,
-        rows.size(),
-        (ps, row) -> {
-          ps.setInt(1, ((Number) row.get("size")).intValue());
-          ps.setInt(2, ((Number) row.get("id")).intValue());
-        });
+  public void updateDocumentSize(int documentId, int size) {
+    String sql = "UPDATE documents SET document_size = ? WHERE id = ?";
+    jdbcTemplate.update(sql, size, documentId);
   }
 
-  public void populateIDF() {
+  public void calculateIDF() {
     int totalDocCount = getTotalDocumentCount();
     if (totalDocCount == 0) return;
 
@@ -429,8 +428,7 @@ public class DatabaseHelper {
         rows,
         rows.size(),
         (ps, row) -> {
-          int docFrequency = ((Number) row.get("doc_count")).intValue();
-          // Using natural logarithm for IDF
+          int docFrequency = ((Number) row.get("doc_frequency")).intValue();
           double idf = Math.log((double) totalDocCount / docFrequency + 1);
           ps.setDouble(1, idf);
           ps.setInt(2, ((Number) row.get("id")).intValue());

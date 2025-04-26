@@ -91,6 +91,9 @@ public class Indexer {
         databaseHelper.batchInsertDocumentWords(
             document.getId(), words, stems, positions, sections);
 
+        // Update document's total word count
+        databaseHelper.updateDocumentSize(document.getId(), words.size());
+
         ConsoleColors.printInfo("Indexer");
         System.out.println(
             "  Indexed " + words.size() + " words for document ID=" + document.getId());
@@ -134,10 +137,14 @@ public class Indexer {
       while (!docs.isEmpty()) {
         indexDocument(docs.poll());
       }
-      // batch update document_sizes after all documents are indexed
-      databaseHelper.populateDocumentSizes();
-      // precompute idf values
-      databaseHelper.populateIDF();
+
+      ConsoleColors.printInfo("Indexer");
+      System.out.println("Indexing documents completed");
+
+      // Precompute IDF for ranker
+      ConsoleColors.printInfo("Indexer");
+      System.out.println("Calculating IDF for ranker...");
+      databaseHelper.calculateIDF();
 
       ConsoleColors.printSuccess("Indexer");
       System.out.println("All done!");
