@@ -2,10 +2,12 @@ package com.sherlook.search.crawler;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
+import com.sherlook.search.utils.Hash;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -21,6 +23,7 @@ public class CrawlTask implements Runnable {
   private Set<String> visitedUrls;
   private final int maxDepth;
   private final int threadId;
+  private Set<String> visitedUrlsHashes;
 
   public CrawlTask(
       PersistentQueue urlQueue,
@@ -37,6 +40,7 @@ public class CrawlTask implements Runnable {
     this.visitedUrls = visitedUrls;
     this.maxDepth = maxDepth;
     this.threadId = threadId;
+    this.visitedUrlsHashes = ConcurrentHashMap.newKeySet();
   }
 
   public void run() {
@@ -73,18 +77,21 @@ public class CrawlTask implements Runnable {
       }
 
       // Check if the URL is already crawled
+      // Check in memory first
       if (!visitedUrls.add(urlToCrawl)) {
         ConsoleColors.printInfo(crawlTaskString);
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
+      // Check in the database
       if (databaseHelper.isUrlCrawled(urlToCrawl)) {
         ConsoleColors.printInfo(crawlTaskString);
         System.out.println("URL already crawled: " + urlToCrawl);
         return true;
       }
 
+      // Check if the URL is allowed to be crawled
       if (!Robots.isAllowed(urlToCrawl)) {
         ConsoleColors.printWarning(crawlTaskString);
         System.out.println("Crawling not allowed by robots.txt: " + urlToCrawl);
@@ -94,12 +101,28 @@ public class CrawlTask implements Runnable {
       ConsoleColors.printInfo(crawlTaskString);
       System.out.println("Crawling URL: " + urlToCrawl);
       Connection conn = Jsoup.connect(urlToCrawl);
+      conn = conn.timeout(2000);
       Document doc = conn.get();
       if (conn.response().statusCode() == 200) {
         ConsoleColors.printSuccess(crawlTaskString);
         System.out.println("Page title: " + doc.title());
       } else {
         System.out.println("Failed to fetch page. Status code: " + conn.response().statusCode());
+      }
+
+      // Check if the document already exists
+      String hash = Hash.sha256(doc.html());
+
+      if (!visitedUrlsHashes.add(hash)) {
+        ConsoleColors.printWarning(crawlTaskString);
+        System.out.println("Document already crawled: " + urlToCrawl);
+        return true;
+      }
+
+      if (databaseHelper.isHashExsists(hash)) {
+        ConsoleColors.printWarning(crawlTaskString);
+        System.out.println("Document already crawled: " + urlToCrawl);
+        return true;
       }
 
       List<String> links = new ArrayList<>();
@@ -124,7 +147,7 @@ public class CrawlTask implements Runnable {
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
       List<String> uniqueChildrens = links.stream().distinct().toList();
-      saveDocumentWithLinks(urlToCrawl, title, description, uniqueChildrens);
+      saveDocumentWithLinks(urlToCrawl, title, description, hash, uniqueChildrens);
       ConsoleColors.printSuccess(crawlTaskString);
       System.out.println("Saved page to database: " + urlToCrawl);
 
@@ -155,10 +178,14 @@ public class CrawlTask implements Runnable {
 
   @Transactional
   public void saveDocumentWithLinks(
-      String urlToCrawl, String title, String description, List<String> uniqueChildrens)
+      String urlToCrawl,
+      String title,
+      String description,
+      String hash,
+      List<String> uniqueChildrens)
       throws Exception {
     databaseHelper.insertDocument(
-        urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString());
+        urlToCrawl, title, description, htmlSaver.getFilePath(urlToCrawl).toString(), hash);
     int documentId = databaseHelper.getDocumentId(urlToCrawl);
     if (documentId == -1) {
       throw new Exception("Failed to get document ID for URL: " + urlToCrawl);

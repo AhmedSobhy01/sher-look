@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS documents (
     title TEXT,
     description TEXT,
     file_path TEXT NOT NULL,
+    document_hash STRING NOT NULL,
     crawl_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
     index_time DATETIME DEFAULT NULL,
     page_rank REAL DEFAULT 0.0 NOT NULL,

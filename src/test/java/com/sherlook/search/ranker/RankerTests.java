@@ -1,9 +1,6 @@
 package com.sherlook.search.ranker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
 
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.Arrays;
@@ -80,6 +77,12 @@ class RankerTests {
     Map<Integer, RankedDocument> docsById =
         result.stream().collect(Collectors.toMap(RankedDocument::getDocId, d -> d));
 
+    jdbcTemplate.update(
+        "INSERT INTO documents (id, url, title, description, file_path, document_hash, crawl_time) VALUES "
+            + "(1, 'http://example.com', 'Doc 1', 'description 1', 'path1', 'example-hash1', CURRENT_TIMESTAMP), "
+            + "(2, 'http://example2.com', 'Doc 2', 'description 2', 'path2', 'example-hash2', CURRENT_TIMESTAMP), "
+            + "(3, 'http://example3.com', 'Doc 3', 'description 3', 'path3', 'example-hash3', CURRENT_TIMESTAMP), "
+            + "(4, 'http://example4.com', 'Doc 4', 'description 4', 'path4', 'example-hash4', CURRENT_TIMESTAMP)");
     // Document 1 (docId=1)
     RankedDocument doc1 = docsById.get(1);
     assertEquals("https://example.com", doc1.getUrl(), "Document 1 URL");

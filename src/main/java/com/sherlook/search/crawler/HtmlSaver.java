@@ -1,13 +1,12 @@
 package com.sherlook.search.crawler;
 
+import com.sherlook.search.utils.Hash;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 
 public class HtmlSaver {
   private final Path saveDir;
@@ -26,13 +25,7 @@ public class HtmlSaver {
 
   public Path getFilePath(String url) throws NoSuchAlgorithmException {
     String normalized = UrlNormalizer.normalize(url);
-    String hash = sha256(normalized);
+    String hash = Hash.sha256(normalized);
     return saveDir.resolve(hash + ".html");
-  }
-
-  private String sha256(String input) throws NoSuchAlgorithmException {
-    MessageDigest digest = MessageDigest.getInstance("SHA-256");
-    byte[] hash = digest.digest(input.getBytes());
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
   }
 }
