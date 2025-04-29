@@ -117,6 +117,7 @@ class RankerTests {
     assertEquals(0.0149, doc3.getTfIdf(), 0.001, "Document 3 TF-IDF score");
   }
 
+  // pagerank tests
   @Test
   public void testComputePageRank_SimpleGraph() {
     // 3 documents, simple link structure
