@@ -1,6 +1,5 @@
 package com.sherlook.search.ranker;
 
-import com.sherlook.search.indexer.InvertedIndex;
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
@@ -28,7 +27,7 @@ public class Ranker {
   }
 
   public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, Boolean isPhraseSearch) {
-    //compute time for this query
+    // compute time for this query
     long startTime = System.currentTimeMillis();
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
     long endTime = System.currentTimeMillis();
@@ -188,7 +187,8 @@ public class Ranker {
    * @param isPhraseSearch
    * @return List of ranked documents
    */
-  public List<RankedDocument> rank(List<String> queryTerms, Boolean isPhraseSearch, int offset, int limit) {
+  public List<RankedDocument> rank(
+      List<String> queryTerms, Boolean isPhraseSearch, int offset, int limit) {
     List<RankedDocument> tfIdfDocs = getDocumentTfIdf(queryTerms, isPhraseSearch);
     List<Integer> docIds =
         tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());

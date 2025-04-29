@@ -250,16 +250,19 @@ public class DatabaseHelper {
     String wordIdSql = "SELECT id, word FROM words WHERE word IN (" + wordPlaceholders + ")";
     Map<Integer, String> wordIdToWord = new HashMap<>();
 
-    jdbcTemplate.query(wordIdSql, ps -> {
-      for (int i = 0; i < queryTerms.size(); i++) {
-        ps.setString(i + 1, queryTerms.get(i));
-      }
-    }, rs -> {
-      while (rs.next()) {
-        wordIdToWord.put(rs.getInt("id"), rs.getString("word"));
-      }
-      return null;
-    });
+    jdbcTemplate.query(
+        wordIdSql,
+        ps -> {
+          for (int i = 0; i < queryTerms.size(); i++) {
+            ps.setString(i + 1, queryTerms.get(i));
+          }
+        },
+        rs -> {
+          while (rs.next()) {
+            wordIdToWord.put(rs.getInt("id"), rs.getString("word"));
+          }
+          return null;
+        });
 
     if (wordIdToWord.isEmpty()) {
       return Collections.emptyList();
@@ -267,53 +270,71 @@ public class DatabaseHelper {
 
     // Step 2: Use word IDs to fetch document terms directly
     String idPlaceholders = String.join(",", Collections.nCopies(wordIdToWord.size(), "?"));
-    String sql = "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, " +
-            "d.document_size, dw.position " +
-            "FROM document_words dw " +
-            "JOIN documents d ON dw.document_id = d.id " +
-            "WHERE dw.word_id IN (" + idPlaceholders + ") " +
-            "GROUP BY d.id, dw.word_id, dw.section";
+    String sql =
+        "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, "
+            + "d.document_size,"
+            + "GROUP_CONCAT(dw.position) AS positions "
+            + "FROM document_words dw "
+            + "JOIN documents d ON dw.document_id = d.id "
+            + "WHERE dw.word_id IN ("
+            + idPlaceholders
+            + ") "
+            + "GROUP BY d.id, dw.word_id, dw.section";
 
     // Process results in Java instead of using GROUP_CONCAT
     Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
 
-      long startTime = System.currentTimeMillis();
-    jdbcTemplate.query(sql, ps -> {
-      int i = 1;
-      for (Integer wordId : wordIdToWord.keySet()) {
-        ps.setInt(i++, wordId);
-      }
-    }, rs -> {
-      while (rs.next()) {
-        int docId = rs.getInt("document_id");
-        int wordId = rs.getInt("word_id");
-        String word = wordIdToWord.get(wordId);
-        String section = rs.getString("section");
-        int position = rs.getInt("position");
-
-        Pair<Integer, Integer> key = Pair.of(docId, wordId);
-        DocumentTermBuilder builder = builders.computeIfAbsent(key, k -> {
-          try {
-            return new DocumentTermBuilder(
-                    word, docId, rs.getString("url"),
-                    rs.getString("title"), rs.getInt("document_size"));
-          } catch (SQLException e) {
-            throw new RuntimeException(e);
+    long startTime = System.currentTimeMillis();
+    jdbcTemplate.query(
+        sql,
+        ps -> {
+          int i = 1;
+          for (Integer wordId : wordIdToWord.keySet()) {
+            ps.setInt(i++, wordId);
           }
+        },
+        rs -> {
+          while (rs.next()) {
+            int docId = rs.getInt("document_id");
+            int wordId = rs.getInt("word_id");
+            String word = wordIdToWord.get(wordId);
+            String section = rs.getString("section");
+            String positionsStr = rs.getString("positions");
+            List<Integer> positions = new ArrayList<>();
+            if (positionsStr != null && !positionsStr.isEmpty()) {
+              positions =
+                  Arrays.stream(positionsStr.split(","))
+                      .map(String::trim)
+                      .map(Integer::parseInt)
+                      .collect(Collectors.toList());
+            }
+
+            Pair<Integer, Integer> key = Pair.of(docId, wordId);
+            DocumentTermBuilder builder =
+                builders.computeIfAbsent(
+                    key,
+                    k -> {
+                      try {
+                        return new DocumentTermBuilder(
+                            word,
+                            docId,
+                            rs.getString("url"),
+                            rs.getString("title"),
+                            rs.getInt("document_size"));
+                      } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                      }
+                    });
+
+            builder.addPositions(section, positions);
+          }
+          return null;
         });
 
-        // Add this single position to the appropriate section
-        builder.addPositions(section, Collections.singletonList(position));
-      }
-      return null;
-    });
-
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        System.out.println("Time taken to process document term each : " + duration + " ms");
-    return builders.values().stream()
-            .map(DocumentTermBuilder::build)
-            .collect(Collectors.toList());
+    long endTime = System.currentTimeMillis();
+    long duration = endTime - startTime;
+    System.out.println("Time taken to process document term each : " + duration + " ms");
+    return builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
   }
 
   public Map<String, Integer> getTermFrequencyAcrossDocuments(List<String> queryTerms) {
@@ -374,11 +395,14 @@ public class DatabaseHelper {
       int endIndex = Math.min(i + batchSize, entries.size());
       List<Map.Entry<Integer, Double>> batch = entries.subList(i, endIndex);
 
-      jdbcTemplate.batchUpdate(sql, batch, batch.size(),
-              (ps, entry) -> {
-                ps.setDouble(1, entry.getValue());
-                ps.setInt(2, entry.getKey());
-              });
+      jdbcTemplate.batchUpdate(
+          sql,
+          batch,
+          batch.size(),
+          (ps, entry) -> {
+            ps.setDouble(1, entry.getValue());
+            ps.setInt(2, entry.getKey());
+          });
 
       // Small delay between batches
       try {
@@ -473,52 +497,19 @@ public class DatabaseHelper {
     batchInsertDocumentWords(documentId, words, stems, positions, sections);
   }
 
+  // i would keep this to show him the FTS implementation if he wanted to :"
   public void populateFtsTable() {
     // Clear any existing FTS data
     jdbcTemplate.execute("DELETE FROM document_fts");
 
     // Insert all document words into FTS
-    String sql = "INSERT INTO document_fts(document_id, word, section, position) " +
-            "SELECT dw.document_id, w.word, dw.section, dw.position " +
-            "FROM document_words dw " +
-            "JOIN words w ON dw.word_id = w.id";
+    String sql =
+        "INSERT INTO document_fts(document_id, word, section, position) "
+            + "SELECT dw.document_id, w.word, dw.section, dw.position "
+            + "FROM document_words dw "
+            + "JOIN words w ON dw.word_id = w.id";
 
     jdbcTemplate.execute(sql);
     System.out.println("FTS table populated successfully");
   }
-
-  public List<DocumentWord> getPostingsForWord(String word) {
-    String sql =
-            "SELECT dw.document_id, dw.position, dw.section, d.document_size, d.url, d.title, "
-                    + "w.word, w.id as word_id "
-                    + "FROM document_words dw "
-                    + "JOIN words w ON dw.word_id = w.id "
-                    + "JOIN documents d ON dw.document_id = d.id "
-                    + "WHERE w.word = ?";
-
-    return jdbcTemplate.query(sql, new Object[]{word}, (rs, rowNum) -> {
-      int wId = (rs.getInt("word_id"));
-      String wordText = (rs.getString("word"));
-      Word w = new Word(wId, wordText);
-
-        Document d =
-                new Document(
-                        rs.getInt("document_id"),
-                        rs.getString("url"),
-                        rs.getString("title"),
-                        null,
-                        null,
-                        null);
-        d.setSize(rs.getInt("document_size"));
-
-
-      DocumentWord dw = new DocumentWord(
-              d,
-              w,
-              rs.getInt("position"),
-              Section.fromString(rs.getString("section")));
-      return dw;
-    });
-  }
-
 }

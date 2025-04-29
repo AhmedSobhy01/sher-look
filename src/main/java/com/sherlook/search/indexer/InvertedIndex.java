@@ -1,7 +1,6 @@
 package com.sherlook.search.indexer;
 
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +17,7 @@ public class InvertedIndex {
     this.databaseHelper = databaseHelper;
     this.index = new HashMap<>();
   }
-
+  /*
   public List<DocumentWord> getPostings(String word) {
     // Load from database if not cached
     if (!index.containsKey(word)) {
@@ -27,7 +26,7 @@ public class InvertedIndex {
     }
     return index.getOrDefault(word, new ArrayList<>());
   }
-/*
+
   public Map<Integer, List<DocumentWord>> getDocTerms(List<String> queryTerms) {
     Map<Integer, List<DocumentWord>> docTerms = new HashMap<>();
 

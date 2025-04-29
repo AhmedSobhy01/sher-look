@@ -3,7 +3,6 @@ package com.sherlook.search.ranker;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.sherlook.search.indexer.InvertedIndex;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -19,7 +18,6 @@ class RankerTest {
 
   @Mock private DatabaseHelper databaseHelper;
 
-
   @InjectMocks private Ranker ranker;
 
   private static final double DELTA = 1e-6;
@@ -28,7 +26,6 @@ class RankerTest {
   @Test
   void testGetTfIdf_TypicalCase() {
     List<String> queryTerms = Arrays.asList("machine", "learning");
-    when(databaseHelper.getTotalDocumentCount()).thenReturn(1000);
 
     Map<String, Double> mockIdfMap =
         Map.of(

@@ -5,13 +5,11 @@ import com.sherlook.search.indexer.Indexer;
 import com.sherlook.search.ranker.RankedDocument;
 import com.sherlook.search.ranker.Ranker;
 import com.sherlook.search.utils.DatabaseHelper;
+import java.util.Arrays;
+import java.util.List;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 @SpringBootApplication
 public class Application {
@@ -36,36 +34,37 @@ public class Application {
           System.out.println("Ready to serve");
           break;
 
-/*
-        case "pagerank":
+          /*
+                 case "pagerank":
+                   Ranker ranker = context.getBean(Ranker.class);
+                   // compute time
+                     long startTime = System.currentTimeMillis();
+                   ranker.rankPagesByPopularity();
+                     long endTime = System.currentTimeMillis();
+                     long duration = endTime - startTime;
+                     System.out.println("Time taken to compute PageRank: " + duration + " ms");
+                   break;
+
+          */
+
+        case "rank":
           Ranker ranker = context.getBean(Ranker.class);
           // compute time
-            long startTime = System.currentTimeMillis();
-          ranker.rankPagesByPopularity();
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-            System.out.println("Time taken to compute PageRank: " + duration + " ms");
+
+          long startTime = System.currentTimeMillis();
+          // of and and are bottlenecks
+          List<String> queryTerms = Arrays.asList("linear", "algebra");
+          List<RankedDocument> ranked = ranker.rank(queryTerms, false, 3, 20);
+          long endTime = System.currentTimeMillis();
+          long duration = endTime - startTime;
+          System.out.println("Time taken to compute Rank: " + duration + " ms");
+          System.out.println("Ranked documents number :" + ranked.size());
+          System.out.println(
+              "Ranked document first with url: "
+                  + ranked.get(0).getUrl()
+                  + " with title "
+                  + ranked.get(0).getTitle());
           break;
-
- */
-
-
-
-          case "rank":
-            Ranker ranker = context.getBean(Ranker.class);
-            // compute time
-
-            long startTime = System.currentTimeMillis();
-            // of and and are bottlenecks
-            List<String> queryTerms = Arrays.asList("how", "google", "works");
-            List<RankedDocument> ranked = ranker.rank(queryTerms, false, 3, 20);
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-            System.out.println("Time taken to compute Rank: " + duration + " ms");
-            System.out.println("Ranked documents number :" + ranked.size());
-            System.out.println("Ranked document first with url: " + ranked.get(1).getUrl() + " with title " + ranked.get(0).getTitle());
-            break;
-
 
         default:
           System.out.println("Usage: java -jar search-engine.jar [crawl|index|serve]");
