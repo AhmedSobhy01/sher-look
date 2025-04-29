@@ -1,5 +1,6 @@
-PRAGMA journal_mode = WAL;
-PRAGMA busy_timeout = 500;
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout = 5000;
+
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT UNIQUE,
@@ -8,13 +9,16 @@ CREATE TABLE IF NOT EXISTS documents (
     file_path TEXT NOT NULL,
     document_hash STRING NOT NULL,
     crawl_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    index_time DATETIME DEFAULT NULL
+    index_time DATETIME DEFAULT NULL,
+    page_rank REAL DEFAULT 0.0 NOT NULL,
+    document_size INTEGER DEFAULT 0 NOT NULL
 );
 CREATE TABLE IF NOT EXISTS words (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     word TEXT NOT NULL UNIQUE,
-    stem TEXT NOT NULL,
-    count INTEGER DEFAULT 0 NOT NULL
+    count INTEGER DEFAULT 0 NOT NULL,
+    idf REAL DEFAULT 0.0 NOT NULL,
+    stem TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS document_words (
     document_id INTEGER,
@@ -25,9 +29,14 @@ CREATE TABLE IF NOT EXISTS document_words (
     FOREIGN KEY(word_id) REFERENCES words(id),
     PRIMARY KEY(document_id, word_id, position)
 );
+
 CREATE TABLE IF NOT EXISTS links (
     source_document_id INTEGER,
     target_url TEXT NOT NULL,
     FOREIGN KEY(source_document_id) REFERENCES documents(id),
     PRIMARY KEY(source_document_id, target_url)
 );
+
+CREATE INDEX IF NOT EXISTS idx_document_words_covering ON document_words(word_id, document_id, section, position);
+CREATE INDEX IF NOT EXISTS idx_document_words ON document_words(document_id);
+CREATE INDEX IF NOT EXISTS idx_words ON words(word);
