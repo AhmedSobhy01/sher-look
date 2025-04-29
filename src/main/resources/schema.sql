@@ -1,5 +1,5 @@
 PRAGMA journal_mode=WAL;
-PRAGMA busy_timeout = 500;
+PRAGMA busy_timeout = 5000;
 
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,3 +35,7 @@ CREATE TABLE IF NOT EXISTS links (
     FOREIGN KEY(source_document_id) REFERENCES documents(id),
     PRIMARY KEY(source_document_id, target_url)
 );
+
+CREATE INDEX IF NOT EXISTS idx_document_words_covering ON document_words(word_id, document_id, section, position);
+CREATE INDEX IF NOT EXISTS idx_document_words ON document_words(document_id);
+CREATE INDEX IF NOT EXISTS idx_words ON words(word);

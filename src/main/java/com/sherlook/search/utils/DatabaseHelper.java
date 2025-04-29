@@ -1,9 +1,6 @@
 package com.sherlook.search.utils;
 
-import com.sherlook.search.indexer.Document;
-import com.sherlook.search.indexer.DocumentWord;
-import com.sherlook.search.indexer.Section;
-import com.sherlook.search.indexer.Word;
+import com.sherlook.search.indexer.*;
 import com.sherlook.search.ranker.DocumentTerm;
 import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
 import com.sherlook.search.ranker.Link;
@@ -248,70 +245,75 @@ public class DatabaseHelper {
       return Collections.emptyList();
     }
 
-    String placeholders = String.join(",", Collections.nCopies(queryTerms.size(), "?"));
-    String sql =
-        "SELECT d.id AS document_id, d.url, d.title, w.word, w.id AS word_id, dw.section, d.document_size, "
-            + "GROUP_CONCAT(dw.position) AS positions "
-            + "FROM document_words dw "
-            + "JOIN documents d ON dw.document_id = d.id "
-            + "JOIN words w ON dw.word_id = w.id "
-            + "WHERE w.word IN ("
-            + placeholders
-            + ") "
-            + "GROUP BY d.id, w.id, dw.section";
+    // Step 1: Get word IDs first (smaller, faster query)
+    String wordPlaceholders = String.join(",", Collections.nCopies(queryTerms.size(), "?"));
+    String wordIdSql = "SELECT id, word FROM words WHERE word IN (" + wordPlaceholders + ")";
+    Map<Integer, String> wordIdToWord = new HashMap<>();
 
-    return jdbcTemplate.query(
-        sql,
-        ps -> {
-          for (int i = 0; i < queryTerms.size(); i++) {
-            ps.setString(i + 1, queryTerms.get(i));
+    jdbcTemplate.query(wordIdSql, ps -> {
+      for (int i = 0; i < queryTerms.size(); i++) {
+        ps.setString(i + 1, queryTerms.get(i));
+      }
+    }, rs -> {
+      while (rs.next()) {
+        wordIdToWord.put(rs.getInt("id"), rs.getString("word"));
+      }
+      return null;
+    });
+
+    if (wordIdToWord.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    // Step 2: Use word IDs to fetch document terms directly
+    String idPlaceholders = String.join(",", Collections.nCopies(wordIdToWord.size(), "?"));
+    String sql = "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, " +
+            "d.document_size, dw.position " +
+            "FROM document_words dw " +
+            "JOIN documents d ON dw.document_id = d.id " +
+            "WHERE dw.word_id IN (" + idPlaceholders + ") " +
+            "GROUP BY d.id, dw.word_id, dw.section";
+
+    // Process results in Java instead of using GROUP_CONCAT
+    Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
+
+      long startTime = System.currentTimeMillis();
+    jdbcTemplate.query(sql, ps -> {
+      int i = 1;
+      for (Integer wordId : wordIdToWord.keySet()) {
+        ps.setInt(i++, wordId);
+      }
+    }, rs -> {
+      while (rs.next()) {
+        int docId = rs.getInt("document_id");
+        int wordId = rs.getInt("word_id");
+        String word = wordIdToWord.get(wordId);
+        String section = rs.getString("section");
+        int position = rs.getInt("position");
+
+        Pair<Integer, Integer> key = Pair.of(docId, wordId);
+        DocumentTermBuilder builder = builders.computeIfAbsent(key, k -> {
+          try {
+            return new DocumentTermBuilder(
+                    word, docId, rs.getString("url"),
+                    rs.getString("title"), rs.getInt("document_size"));
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
           }
-        },
-        rs -> {
-          Map<Pair<Integer, Integer>, DocumentTermBuilder> builders =
-              new HashMap<>(); // one builder per (docId, wordId)
-          List<DocumentTerm> result = new ArrayList<>();
-
-          while (rs.next()) {
-            int docId = rs.getInt("document_id");
-            int wordId = rs.getInt("word_id");
-            int documentSize = rs.getInt("document_size");
-            String section = rs.getString("section");
-            String positionsString = rs.getString("positions");
-
-            Pair<Integer, Integer> key = Pair.of(docId, wordId);
-
-            DocumentTermBuilder builder =
-                builders.computeIfAbsent(
-                    key,
-                    k -> {
-                      try {
-                        return new DocumentTermBuilder(
-                            rs.getString("word"),
-                            docId,
-                            rs.getString("url"),
-                            rs.getString("title"),
-                            documentSize);
-                      } catch (SQLException e) {
-                        throw new RuntimeException(e);
-                      }
-                    });
-
-            if (positionsString != null && !positionsString.isEmpty()) {
-              List<Integer> positions =
-                  Arrays.stream(positionsString.split(","))
-                      .map(Integer::parseInt)
-                      .collect(Collectors.toList());
-              builder.addPositions(section, positions);
-            }
-          }
-
-          for (DocumentTermBuilder builder : builders.values()) {
-            result.add(builder.build());
-          }
-
-          return result;
         });
+
+        // Add this single position to the appropriate section
+        builder.addPositions(section, Collections.singletonList(position));
+      }
+      return null;
+    });
+
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        System.out.println("Time taken to process document term each : " + duration + " ms");
+    return builders.values().stream()
+            .map(DocumentTermBuilder::build)
+            .collect(Collectors.toList());
   }
 
   public Map<String, Integer> getTermFrequencyAcrossDocuments(List<String> queryTerms) {
@@ -336,7 +338,7 @@ public class DatabaseHelper {
   public List<Link> getLinks() {
     List<Link> links = new ArrayList<>();
     String sql =
-        "SELECT l.source_document_id, d.document_id as target_document_id"
+        "SELECT l.source_document_id, d.id as target_document_id"
             + " FROM links l"
             + " JOIN documents d ON l.target_url = d.url";
     jdbcTemplate.query(
@@ -365,14 +367,26 @@ public class DatabaseHelper {
 
   public void batchUpdatePageRank(Map<Integer, Double> pageRank) {
     String sql = "UPDATE documents SET page_rank = ? WHERE id = ?";
-    jdbcTemplate.batchUpdate(
-        sql,
-        pageRank.entrySet(),
-        pageRank.size(),
-        (ps, entry) -> {
-          ps.setDouble(1, entry.getValue());
-          ps.setInt(2, entry.getKey());
-        });
+    int batchSize = 500;
+
+    List<Map.Entry<Integer, Double>> entries = new ArrayList<>(pageRank.entrySet());
+    for (int i = 0; i < entries.size(); i += batchSize) {
+      int endIndex = Math.min(i + batchSize, entries.size());
+      List<Map.Entry<Integer, Double>> batch = entries.subList(i, endIndex);
+
+      jdbcTemplate.batchUpdate(sql, batch, batch.size(),
+              (ps, entry) -> {
+                ps.setDouble(1, entry.getValue());
+                ps.setInt(2, entry.getKey());
+              });
+
+      // Small delay between batches
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   public Map<Integer, Double> getPageRank(List<Integer> docIds) {
@@ -429,7 +443,7 @@ public class DatabaseHelper {
         rows,
         rows.size(),
         (ps, row) -> {
-          int docFrequency = ((Number) row.get("doc_count")).intValue();
+          int docFrequency = ((Number) row.get("doc_frequency")).intValue();
           // Using natural logarithm for IDF
           double idf = Math.log((double) totalDocCount / docFrequency + 1);
           ps.setDouble(1, idf);
@@ -458,4 +472,53 @@ public class DatabaseHelper {
 
     batchInsertDocumentWords(documentId, words, stems, positions, sections);
   }
+
+  public void populateFtsTable() {
+    // Clear any existing FTS data
+    jdbcTemplate.execute("DELETE FROM document_fts");
+
+    // Insert all document words into FTS
+    String sql = "INSERT INTO document_fts(document_id, word, section, position) " +
+            "SELECT dw.document_id, w.word, dw.section, dw.position " +
+            "FROM document_words dw " +
+            "JOIN words w ON dw.word_id = w.id";
+
+    jdbcTemplate.execute(sql);
+    System.out.println("FTS table populated successfully");
+  }
+
+  public List<DocumentWord> getPostingsForWord(String word) {
+    String sql =
+            "SELECT dw.document_id, dw.position, dw.section, d.document_size, d.url, d.title, "
+                    + "w.word, w.id as word_id "
+                    + "FROM document_words dw "
+                    + "JOIN words w ON dw.word_id = w.id "
+                    + "JOIN documents d ON dw.document_id = d.id "
+                    + "WHERE w.word = ?";
+
+    return jdbcTemplate.query(sql, new Object[]{word}, (rs, rowNum) -> {
+      int wId = (rs.getInt("word_id"));
+      String wordText = (rs.getString("word"));
+      Word w = new Word(wId, wordText);
+
+        Document d =
+                new Document(
+                        rs.getInt("document_id"),
+                        rs.getString("url"),
+                        rs.getString("title"),
+                        null,
+                        null,
+                        null);
+        d.setSize(rs.getInt("document_size"));
+
+
+      DocumentWord dw = new DocumentWord(
+              d,
+              w,
+              rs.getInt("position"),
+              Section.fromString(rs.getString("section")));
+      return dw;
+    });
+  }
+
 }

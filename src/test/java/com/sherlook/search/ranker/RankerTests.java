@@ -3,6 +3,7 @@ package com.sherlook.search.ranker;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.sherlook.search.indexer.InvertedIndex;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RankerTest {
 
   @Mock private DatabaseHelper databaseHelper;
+
 
   @InjectMocks private Ranker ranker;
 

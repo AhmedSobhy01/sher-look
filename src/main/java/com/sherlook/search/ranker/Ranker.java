@@ -1,5 +1,6 @@
 package com.sherlook.search.ranker;
 
+import com.sherlook.search.indexer.InvertedIndex;
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
 import java.util.*;
@@ -27,10 +28,12 @@ public class Ranker {
   }
 
   public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, Boolean isPhraseSearch) {
+    //compute time for this query
+    long startTime = System.currentTimeMillis();
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
-    Map<String, Integer> termFrequencies =
-        databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
-    int totalDocumentCount = databaseHelper.getTotalDocumentCount();
+    long endTime = System.currentTimeMillis();
+    long duration = endTime - startTime;
+    System.out.println("Time taken to get document terms: " + duration + " ms");
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
@@ -154,11 +157,12 @@ public class Ranker {
     if (!converged) {
       System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
-
+    /*
     System.out.println("Scores");
     for (int docId : docIds) {
       System.out.println("Doc ID: " + docId + ", Score: " + pageRankPrevious.get(docId));
     }
+    */
     return pageRankPrevious;
   }
 
@@ -184,11 +188,12 @@ public class Ranker {
    * @param isPhraseSearch
    * @return List of ranked documents
    */
-  List<RankedDocument> rank(List<String> queryTerms, Boolean isPhraseSearch) {
+  public List<RankedDocument> rank(List<String> queryTerms, Boolean isPhraseSearch, int offset, int limit) {
     List<RankedDocument> tfIdfDocs = getDocumentTfIdf(queryTerms, isPhraseSearch);
     List<Integer> docIds =
         tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
     Map<Integer, Double> pageRankScores = databaseHelper.getPageRank(docIds);
+
     for (RankedDocument doc : tfIdfDocs) {
       double tfIdfScore = doc.getTfIdf();
       double pageRankScore = pageRankScores.getOrDefault(doc.getDocId(), 0.0);
