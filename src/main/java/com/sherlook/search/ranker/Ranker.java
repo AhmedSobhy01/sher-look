@@ -2,7 +2,12 @@ package com.sherlook.search.ranker;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -30,9 +35,9 @@ public class Ranker {
     // compute time for this query
     long startTime = System.currentTimeMillis();
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
-    long endTime = System.currentTimeMillis();
-    long duration = endTime - startTime;
-    System.out.println("Time taken to get document terms: " + duration + " ms");
+    Map<String, Integer> termFrequencies =
+        databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
+    int totalDocumentCount = databaseHelper.getTotalDocumentCount();
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
@@ -156,12 +161,11 @@ public class Ranker {
     if (!converged) {
       System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
-    /*
+
     System.out.println("Scores");
     for (int docId : docIds) {
       System.out.println("Doc ID: " + docId + ", Score: " + pageRankPrevious.get(docId));
     }
-    */
     return pageRankPrevious;
   }
 
