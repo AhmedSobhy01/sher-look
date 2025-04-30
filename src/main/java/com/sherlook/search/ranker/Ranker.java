@@ -18,7 +18,7 @@ public class Ranker {
   private final DatabaseHelper databaseHelper;
 
   private static final Map<String, Double> SECTION_WEIGHTS =
-      Map.of("title", 2.0, "header", 1.3, "body", 1.0);
+      Map.of("title", 2.0, "header", 1.5, "body", 1.0);
   private static final double IDF_SMOOTHING_FACTOR = 0.0001;
   private static final double DAMPING_FACTOR_PAGE_RANK = 0.85;
   private static final double CONVERGENCE_THRESHOLD = 0.00001;
