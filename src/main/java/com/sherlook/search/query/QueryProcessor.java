@@ -1,12 +1,11 @@
 package com.sherlook.search.query;
 
 import com.sherlook.search.indexer.Stemmer;
-import org.springframework.stereotype.Component;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.stereotype.Component;
 
 @Component
 public class QueryProcessor {
@@ -51,10 +50,9 @@ public class QueryProcessor {
     }
   }
 
-
   /**
-   * Parses the tokens from the query and applies additional processing logic.
-   * Populates the `tokens` and `stems` lists.
+   * Parses the tokens from the query and applies additional processing logic. Populates the
+   * `tokens` and `stems` lists.
    *
    * @param query the search query to parse tokens from
    */
@@ -73,8 +71,8 @@ public class QueryProcessor {
   }
 
   /**
-   * Parses the phrases and logical operators (AND, OR, NOT) in the query.
-   * Populates the `phrases` and `operators` arrays based on the query content.
+   * Parses the phrases and logical operators (AND, OR, NOT) in the query. Populates the `phrases`
+   * and `operators` arrays based on the query content.
    *
    * @param query the search query containing phrases and operators
    */
