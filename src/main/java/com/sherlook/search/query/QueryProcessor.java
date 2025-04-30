@@ -1,6 +1,7 @@
 package com.sherlook.search.query;
 
 import com.sherlook.search.indexer.Stemmer;
+import com.sherlook.search.indexer.StopWordsFilter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -21,7 +22,7 @@ public class QueryProcessor {
     lastQuery = null;
     isPhraseMatching = false;
     phrases = new String[3];
-    operators = new int[2]; // Operators: (0) None, (1) AND, (2) OR, (3) NOT
+    operators = new int[2]; // Two operators: (0) None, (1) AND, (2) OR, (3) NOT
     tokens = new ArrayList<>();
     stems = new ArrayList<>();
   }
@@ -58,12 +59,13 @@ public class QueryProcessor {
    */
   private void parseTokens(String query) {
     Stemmer stemmer = new Stemmer();
+    StopWordsFilter filter = new StopWordsFilter();
     tokens.clear();
     stems.clear();
     isPhraseMatching = false;
     String[] words = query.toLowerCase().split("\\W+");
     for (String word : words) {
-      if (!word.isEmpty()) {
+      if (!(word.isEmpty() || filter.isStopWord(word))) {
         tokens.add(word);
         stems.add(stemmer.stem(word));
       }
