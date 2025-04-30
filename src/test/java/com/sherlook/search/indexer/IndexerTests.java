@@ -37,6 +37,7 @@ public class IndexerTests {
   @Mock private PlatformTransactionManager txManager;
   @Mock private TransactionStatus txStatus;
   @Mock private Tokenizer tokenizer;
+  @Mock private StopWordsFilter stopWordsFilter;
 
   private Indexer indexer;
 
@@ -81,10 +82,13 @@ public class IndexerTests {
 
                   for (String word : words) {
                     if (!word.isEmpty()) {
-                      tokens.add(word);
-                      stems.add(word.length() > 1 ? word.substring(0, word.length() - 1) : word);
-                      positions.add(pos++);
-                      sections.add(section);
+                      if (!stopWordsFilter.isStopWord(word)) {
+                        tokens.add(word);
+                        stems.add(word.length() > 1 ? word.substring(0, word.length() - 1) : word);
+                        positions.add(pos);
+                        sections.add(section);
+                      }
+                      pos++;
                     }
                   }
 
