@@ -1,7 +1,5 @@
 package com.sherlook.search.query;
 
-import static org.mockito.Mockito.*;
-
 import com.sherlook.search.utils.DatabaseHelper;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
