@@ -18,7 +18,7 @@ public class Ranker {
   private final DatabaseHelper databaseHelper;
 
   private static final Map<String, Double> SECTION_WEIGHTS =
-      Map.of("title", 2.0, "header", 1.5, "body", 1.0);
+      Map.of("title", 1.3, "header", 1.2, "body", 1.0);
   private static final double IDF_SMOOTHING_FACTOR = 0.0001;
   private static final double DAMPING_FACTOR_PAGE_RANK = 0.85;
   private static final double CONVERGENCE_THRESHOLD = 0.00001;
@@ -35,9 +35,9 @@ public class Ranker {
     // compute time for this query
     long startTime = System.currentTimeMillis();
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
-    Map<String, Integer> termFrequencies =
-        databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
-    int totalDocumentCount = databaseHelper.getTotalDocumentCount();
+    long endTime = System.currentTimeMillis();
+    long duration = endTime - startTime;
+    System.out.println("Time taken to get document terms from database: " + duration + " ms");
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);

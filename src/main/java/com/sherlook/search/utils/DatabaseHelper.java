@@ -299,7 +299,6 @@ public class DatabaseHelper {
     // Process results in Java instead of using GROUP_CONCAT
     Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
 
-    long startTime = System.currentTimeMillis();
     jdbcTemplate.query(
         sql,
         ps -> {
@@ -348,9 +347,6 @@ public class DatabaseHelper {
           return null;
         });
 
-    long endTime = System.currentTimeMillis();
-    long duration = endTime - startTime;
-    System.out.println("Time taken to process document term each : " + duration + " ms");
     return builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
   }
 
