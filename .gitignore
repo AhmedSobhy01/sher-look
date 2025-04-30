@@ -69,3 +69,4 @@ dist-ssr
 *.sw?
 data/*
 !data/startpages.txt
+!data/stop_words.txt
