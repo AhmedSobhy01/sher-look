@@ -35,9 +35,9 @@ public class Ranker {
     // compute time for this query
     long startTime = System.currentTimeMillis();
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
-    Map<String, Integer> termFrequencies =
-        databaseHelper.getTermFrequencyAcrossDocuments(queryTerms);
-    int totalDocumentCount = databaseHelper.getTotalDocumentCount();
+    long endTime = System.currentTimeMillis();
+    long duration = endTime - startTime;
+    System.out.println("Time taken to get document terms from database: " + duration + " ms");
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
