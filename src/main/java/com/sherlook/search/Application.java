@@ -61,9 +61,9 @@ public class Application {
           System.out.println("Ranked documents number :" + ranked.size());
           System.out.println(
               "Ranked document first with url: "
-                  + ranked.get(2).getUrl()
+                  + ranked.get(0).getUrl()
                   + " with title "
-                  + ranked.get(2).getTitle());
+                  + ranked.get(0).getTitle());
           break;
 
         default:
