@@ -98,7 +98,8 @@ class DatabaseHelperTests {
                     url, "Another Title", "Another Description", TEST_FILE_PATH, TEST_HASH),
             "Should throw exception when inserting document with duplicate URL");
 
-    String exceptionMessage = exception.getMessage().toLowerCase();
+    String msg = exception.getMessage();
+    String exceptionMessage = msg != null ? msg.toLowerCase() : "";
     boolean hasConstraintViolation =
         exceptionMessage.contains("unique")
             || exceptionMessage.contains("duplicate")

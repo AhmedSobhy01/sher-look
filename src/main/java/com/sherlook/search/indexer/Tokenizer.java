@@ -8,10 +8,12 @@ import org.springframework.stereotype.Component;
 public class Tokenizer {
 
   private final Stemmer stemmer;
+  private final StopWordsFilter stopWordsFilter;
 
   @Autowired
-  public Tokenizer(Stemmer stemmer) {
+  public Tokenizer(Stemmer stemmer, StopWordsFilter stopWordsFilter) {
     this.stemmer = stemmer;
+    this.stopWordsFilter = stopWordsFilter;
   }
 
   public int tokenizeWithPositions(
@@ -28,12 +30,14 @@ public class Tokenizer {
 
     for (String word : words) {
       if (!word.isEmpty()) {
-        tokens.add(word);
+        if (!stopWordsFilter.isStopWord(word)) {
+          tokens.add(word);
 
-        if (stems != null) stems.add(stemmer.stem(word));
+          if (stems != null) stems.add(stemmer.stem(word));
 
-        positions.add(pos++);
-        sections.add(currentSection);
+          positions.add(pos++);
+          sections.add(currentSection);
+        }
       }
     }
 
