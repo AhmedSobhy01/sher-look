@@ -30,6 +30,8 @@ public class QueryProcessor {
   public void processQuery(String query) {
     System.out.println("Processing query: " + query);
     if (query == null || query.trim().isEmpty()) {
+      tokens.clear();
+      stems.clear();
       return;
     }
     if (query.equals(lastQuery)) {
