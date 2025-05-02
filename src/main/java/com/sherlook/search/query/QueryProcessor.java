@@ -1,7 +1,6 @@
 package com.sherlook.search.query;
 
-import com.sherlook.search.indexer.Stemmer;
-import com.sherlook.search.indexer.StopWordsFilter;
+import com.sherlook.search.indexer.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -27,12 +26,7 @@ public class QueryProcessor {
     stems = new ArrayList<>();
   }
 
-  /**
-   * Processes a user search query and determines if it contains phrases or individual tokens.
-   * Updates the `isPhraseMatching`, `phrases`, and `operators` fields accordingly.
-   *
-   * @param query the search query to process
-   */
+  // Processes a user search query.
   public void processQuery(String query) {
     System.out.println("Processing query: " + query);
     if (query == null || query.trim().isEmpty()) {
@@ -51,33 +45,16 @@ public class QueryProcessor {
     }
   }
 
-  /**
-   * Parses the tokens from the query and applies additional processing logic. Populates the
-   * `tokens` and `stems` lists.
-   *
-   * @param query the search query to parse tokens from
-   */
+  // Parses the tokens from the query and applies additional processing logic.
   private void parseTokens(String query) {
-    Stemmer stemmer = new Stemmer();
-    StopWordsFilter filter = new StopWordsFilter();
+    Tokenizer tokenizer = new Tokenizer();
     tokens.clear();
     stems.clear();
     isPhraseMatching = false;
-    String[] words = query.toLowerCase().split("\\W+");
-    for (String word : words) {
-      if (!(word.isEmpty() || filter.isStopWord(word))) {
-        tokens.add(word);
-        stems.add(stemmer.stem(word));
-      }
-    }
+    tokenizer.tokenizeQuery(query, tokens, stems);
   }
 
-  /**
-   * Parses the phrases and logical operators (AND, OR, NOT) in the query. Populates the `phrases`
-   * and `operators` arrays based on the query content.
-   *
-   * @param query the search query containing phrases and operators
-   */
+  // Parses the phrases and logical operators (AND, OR, NOT) in the query.
   private void parsePhrases(String query) {
     Matcher phraseMatch = Pattern.compile("\"[^\"]+\"").matcher(query);
     Matcher operatorMatch = Pattern.compile("\"\\s*(AND|OR|NOT)\\s*\"").matcher(query);
@@ -100,47 +77,27 @@ public class QueryProcessor {
     }
   }
 
-  /**
-   * Retrieves the list of tokens processed from the query.
-   *
-   * @return a list of tokens
-   */
+  // Retrieves the list of tokens processed from the query.
   public List<String> getTokens() {
     return tokens;
   }
 
-  /**
-   * Retrieves the list of stemmed tokens processed from the query.
-   *
-   * @return a list of stemmed tokens
-   */
+  // Retrieves the list of stemmed tokens processed from the query.
   public List<String> getStems() {
     return stems;
   }
 
-  /**
-   * Retrieves the array of phrases extracted from the query.
-   *
-   * @return an array of phrases
-   */
+  // Retrieves the array of phrases extracted from the query.
   public String[] getPhrases() {
     return phrases;
   }
 
-  /**
-   * Retrieves the array of operators extracted from the query.
-   *
-   * @return an array of operators
-   */
+  // Retrieves the array of operators extracted from the query.
   public int[] getOperators() {
     return operators;
   }
 
-  /**
-   * Checks if the query contains phrase matching.
-   *
-   * @return true if the query contains phrases, false otherwise
-   */
+  // Checks if the query contains phrase matching.
   public boolean isPhraseMatching() {
     return isPhraseMatching;
   }
