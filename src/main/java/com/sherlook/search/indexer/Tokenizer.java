@@ -22,13 +22,13 @@ public class Tokenizer {
   }
 
   public int tokenizeWithPositions(
-          String text,
-          int startPos,
-          List<String> tokens,
-          List<String> stems,
-          List<Integer> positions,
-          List<Section> sections,
-          Section currentSection) {
+      String text,
+      int startPos,
+      List<String> tokens,
+      List<String> stems,
+      List<Integer> positions,
+      List<Section> sections,
+      Section currentSection) {
 
     String[] words = text.toLowerCase().split("\\W+");
     int pos = startPos;
