@@ -5,10 +5,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@Component
 public class QueryProcessor {
+
+  @Autowired private Tokenizer tokenizer;
 
   boolean isPhraseMatching;
   String[] phrases;
@@ -47,7 +48,6 @@ public class QueryProcessor {
 
   // Parses the tokens from the query and applies additional processing logic.
   private void parseTokens(String query) {
-    Tokenizer tokenizer = new Tokenizer();
     tokens.clear();
     stems.clear();
     isPhraseMatching = false;
