@@ -27,8 +27,7 @@ public class Ranker {
   private static final double TF_IDF_CONTRIBUTION = 0.7;
   private static final double PAGE_RANK_CONTRIBUTION = 0.3;
 
-  // for optimization, helps me avoid two getDocumentTerms db calls, the most
-  // expensive one
+  // for optimization, helps me avoid two getDocumentTerms db calls, the most expensive one
   public static class RankingResult {
     private final List<RankedDocument> rankedDocuments;
     private final List<DocumentTerm> documentTerms;
@@ -57,7 +56,6 @@ public class Ranker {
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
-    System.out.println("IDF map: " + idfMap);
 
     // Group by doc id
     Map<Integer, List<DocumentTerm>> docGroups =
@@ -156,6 +154,14 @@ public class Ranker {
         pageRankCurrent.put(docId, newRank);
       }
 
+      // Normalize current scores to sum to 1
+      double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
+      if (sum > 0) {
+        for (int docId : docIds) {
+          pageRankCurrent.put(docId, pageRankCurrent.get(docId) / sum);
+        }
+      }
+
       double maxDiff = 0.0;
       for (int docId : docIds) {
         double diff = Math.abs(pageRankCurrent.get(docId) - pageRankPrevious.get(docId));
@@ -176,9 +182,18 @@ public class Ranker {
     if (!converged) {
       System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
+
+    System.out.println("Scores");
+    for (int docId : docIds) {
+      System.out.println("Doc ID: " + docId + ", Score: " + pageRankPrevious.get(docId));
+    }
     return pageRankPrevious;
   }
 
+  /**
+   * This method is to be called directly after crawling, and parallel to indexing. It computes and
+   * updates the page rank score of all documents in the database.
+   */
   public void rankPagesByPopularity() {
     System.out.println("Started ranking pages by popularity");
     List<Integer> docIds = databaseHelper.getAllDocumentIds();
@@ -194,8 +209,6 @@ public class Ranker {
 
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
 
-    Map<Integer, List<DocumentTerm>> docGroups =
-        documentTerms.stream().collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
     Map<Integer, List<DocumentTerm>> docGroups =
         documentTerms.stream().collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
 
@@ -359,12 +372,6 @@ public class Ranker {
         allDocTerms.stream()
             .filter(term -> docIds.contains(term.getDocumentId()))
             .collect(Collectors.toList());
-    Set<Integer> docIds =
-        documents.stream().map(RankedDocument::getDocId).collect(Collectors.toSet());
-    List<DocumentTerm> relevantTerms =
-        allDocTerms.stream()
-            .filter(term -> docIds.contains(term.getDocumentId()))
-            .collect(Collectors.toList());
     long filterEnd = System.currentTimeMillis();
     System.out.println("Filtering relevant terms time: " + (filterEnd - filterStart) + " ms");
 
@@ -395,8 +402,6 @@ public class Ranker {
 
     // Measure database call time
     long dbStart = System.currentTimeMillis();
-    Map<Integer, Map<Integer, String>> surroundingWords =
-        databaseHelper.getWordsAroundPositions(docPositions, 10);
     Map<Integer, Map<Integer, String>> surroundingWords =
         databaseHelper.getWordsAroundPositions(docPositions, 10);
     long dbEnd = System.currentTimeMillis();
