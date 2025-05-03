@@ -2,12 +2,8 @@ package com.sherlook.search.ranker;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
+import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -30,11 +26,11 @@ public class Ranker {
     this.databaseHelper = databaseHelper;
   }
 
-  public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, Boolean isPhraseSearch) {
-    List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
+  public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, List<DocumentTerm> documentTerms) {
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
+    System.out.println("IDF map: " + idfMap);
 
     // Group by doc id
     Map<Integer, List<DocumentTerm>> docGroups =
@@ -63,7 +59,7 @@ public class Ranker {
         double idf = idfMap.getOrDefault(dt.getWord(), 0.0);
         tfIdfSum += weightedTf * idf;
       }
-      rankedDocs.add(new RankedDocument(docId, firstTerm.getUrl(), firstTerm.getTitle(), tfIdfSum));
+      rankedDocs.add(new RankedDocument(docId, firstTerm.getUrl(), firstTerm.getTitle(), tfIdfSum, firstTerm.getDescription()));
     }
 
     return rankedDocs;
@@ -127,14 +123,6 @@ public class Ranker {
         pageRankCurrent.put(docId, newRank);
       }
 
-      // Normalize current scores to sum to 1
-      double sum = pageRankCurrent.values().stream().mapToDouble(Double::doubleValue).sum();
-      if (sum > 0) {
-        for (int docId : docIds) {
-          pageRankCurrent.put(docId, pageRankCurrent.get(docId) / sum);
-        }
-      }
-
       double maxDiff = 0.0;
       for (int docId : docIds) {
         double diff = Math.abs(pageRankCurrent.get(docId) - pageRankPrevious.get(docId));
@@ -155,18 +143,9 @@ public class Ranker {
     if (!converged) {
       System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
-
-    System.out.println("Scores");
-    for (int docId : docIds) {
-      System.out.println("Doc ID: " + docId + ", Score: " + pageRankPrevious.get(docId));
-    }
     return pageRankPrevious;
   }
 
-  /**
-   * This method is to be called directly after crawling, and parallel to indexing. It computes and
-   * updates the page rank score of all documents in the database.
-   */
   public void rankPagesByPopularity() {
     System.out.println("Started ranking pages by popularity");
     List<Integer> docIds = databaseHelper.getAllDocumentIds();
@@ -175,6 +154,122 @@ public class Ranker {
     System.out.println("PageRank scores computed");
     databaseHelper.batchUpdatePageRank(pageRankScores);
     System.out.println("PageRank scores updated in the database");
+  }
+
+
+  public List<RankedDocument> getDocumentTfIdfPhrases(List<String> queryTerms, List<DocumentTerm> documentTerms) {
+
+    Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
+
+    Map<Integer, List<DocumentTerm>> docGroups =
+            documentTerms.stream().collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
+
+    List<RankedDocument> rankedDocs = new ArrayList<>();
+
+    for (Map.Entry<Integer, List<DocumentTerm>> entry : docGroups.entrySet()) {
+      int docId = entry.getKey();
+      List<DocumentTerm> terms = entry.getValue();
+
+      Set<String> foundTermsSet = terms.stream()
+              .map(DocumentTerm::getWord)
+              .collect(Collectors.toSet());
+
+      if (!foundTermsSet.containsAll(queryTerms)) {
+        continue;  // Skip if document doesn't contain all query terms
+      }
+
+      DocumentTerm firstTerm = terms.get(0);
+
+      // Check if the terms appear as a phrase in any section
+      if (containsPhrase(terms, queryTerms)) {
+        double score = calculatePhraseScore(terms, idfMap);
+        rankedDocs.add(new RankedDocument(docId, firstTerm.getUrl(),
+                firstTerm.getTitle(), score, firstTerm.getDescription()));
+      }
+    }
+
+    return rankedDocs;
+  }
+
+  private boolean containsPhrase(List<DocumentTerm> terms, List<String> queryTerms) {
+    // Map terms for quick lookup
+    Map<String, DocumentTerm> termMap = new HashMap<>();
+    for (DocumentTerm term : terms) {
+      termMap.put(term.getWord(), term);
+    }
+
+    // Check each section
+    for (String section : terms.get(0).getPositionsBySection().keySet()) {
+      // Ensure all query terms exist in this section
+      boolean allTermsExist = queryTerms.stream()
+              .allMatch(queryTerm -> termMap.containsKey(queryTerm) &&
+                      termMap.get(queryTerm).getPositionsBySection().containsKey(section));
+
+      if (allTermsExist && hasConsecutivePositions(termMap, queryTerms, section)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasConsecutivePositions(
+          Map<String, DocumentTerm> termMap, List<String> queryTerms, String section) {
+
+    DocumentTerm firstTerm = termMap.get(queryTerms.get(0));
+    if (firstTerm == null || !firstTerm.getPositionsBySection().containsKey(section)) {
+      return false;
+    }
+
+    List<Integer> firstPositions = firstTerm.getPositionsBySection().get(section);
+
+    for (int startPos : firstPositions) {
+      boolean phraseFound = true;
+
+      // Check if subsequent terms are at consecutive positions
+      for (int i = 1; i < queryTerms.size(); i++) {
+        DocumentTerm nextTerm = termMap.get(queryTerms.get(i));
+        if (nextTerm == null ||
+                !nextTerm.getPositionsBySection().containsKey(section) ||
+                nextTerm.getPositionsBySection().get(section) == null) {
+          phraseFound = false;
+          break;
+        }
+
+        int expectedPos = startPos + i;
+        List<Integer> positions = nextTerm.getPositionsBySection().get(section);
+
+        if (!positions.contains(expectedPos)) {
+          phraseFound = false;
+          break;
+        }
+      }
+
+      if (phraseFound) return true;
+    }
+
+    return false;
+  }
+
+  private double calculatePhraseScore(List<DocumentTerm> terms, Map<String, Double> idfMap) {
+    double score = 0.0;
+
+    // Calculate scores based on frequency, section weight, and IDF
+    for (DocumentTerm term : terms) {
+      double idf = idfMap.getOrDefault(term.getWord(), 1.0);
+      double termScore = 0.0;
+
+      for (Map.Entry<String, List<Integer>> entry : term.getPositionsBySection().entrySet()) {
+        String section = entry.getKey();
+        double sectionWeight = SECTION_WEIGHTS.getOrDefault(section, 1.0);
+        int frequency = entry.getValue().size();  // Individual term frequency
+
+        termScore += (frequency * sectionWeight) / term.getDocumentSize();
+      }
+
+      score += termScore * idf;
+    }
+
+    return score;
   }
 
   /**
@@ -187,7 +282,13 @@ public class Ranker {
    */
   public List<RankedDocument> rank(
       List<String> queryTerms, Boolean isPhraseSearch, int offset, int limit) {
-    List<RankedDocument> tfIdfDocs = getDocumentTfIdf(queryTerms, isPhraseSearch);
+    List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
+    List<RankedDocument> tfIdfDocs;
+    if (isPhraseSearch) {
+      tfIdfDocs = getDocumentTfIdfPhrases(queryTerms, documentTerms);
+    }else{
+      tfIdfDocs = getDocumentTfIdf(queryTerms, documentTerms);
+    }
     List<Integer> docIds =
         tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
     Map<Integer, Double> pageRankScores = databaseHelper.getPageRank(docIds);
@@ -199,6 +300,103 @@ public class Ranker {
       doc.setFinalScore(finalScore);
     }
     tfIdfDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));
-    return tfIdfDocs;
+
+    int endIndex = Math.min(offset + limit, tfIdfDocs.size());
+    List<RankedDocument> pagedResults = offset < tfIdfDocs.size() ?
+            tfIdfDocs.subList(offset, endIndex) : new ArrayList<>();
+
+    double start = System.currentTimeMillis();
+    // Generate snippets only for paginated results
+    if (!pagedResults.isEmpty()) {
+      generateSnippets(pagedResults, documentTerms, queryTerms);
+    }
+    double end = System.currentTimeMillis();
+    System.out.println("Snippet generation time: " + (end - start) + " ms");
+
+    return pagedResults;
   }
-}
+
+  private void generateSnippets(List<RankedDocument> documents, List<DocumentTerm> allDocTerms, List<String> queryTerms) {
+    long totalStart = System.currentTimeMillis();
+
+    // Measure time for filtering documents
+    long filterStart = System.currentTimeMillis();
+    Set<Integer> docIds = documents.stream().map(RankedDocument::getDocId).collect(Collectors.toSet());
+    List<DocumentTerm> relevantTerms = allDocTerms.stream()
+            .filter(term -> docIds.contains(term.getDocumentId()))
+            .collect(Collectors.toList());
+    long filterEnd = System.currentTimeMillis();
+    System.out.println("Filtering relevant terms time: " + (filterEnd - filterStart) + " ms");
+
+    // Measure time for position calculation
+    long positionStart = System.currentTimeMillis();
+    Map<Integer, List<Integer>> docPositions = new HashMap<>();
+
+    for (DocumentTerm term : relevantTerms) {
+      int docId = term.getDocumentId();
+
+      // Find earliest position across all sections
+      int earliestPos = Integer.MAX_VALUE;
+      for (List<Integer> positions : term.getPositionsBySection().values()) {
+        if (!positions.isEmpty()) {
+          int minPos = Collections.min(positions);
+          if (minPos < earliestPos) {
+            earliestPos = minPos;
+          }
+        }
+      }
+
+      if (earliestPos != Integer.MAX_VALUE) {
+        docPositions.computeIfAbsent(docId, k -> new ArrayList<>()).add(earliestPos);
+      }
+    }
+    long positionEnd = System.currentTimeMillis();
+    System.out.println("Finding positions time: " + (positionEnd - positionStart) + " ms");
+
+    // Measure database call time
+    long dbStart = System.currentTimeMillis();
+    Map<Integer, Map<Integer, String>> surroundingWords =
+            databaseHelper.getWordsAroundPositions(docPositions, 10);
+    long dbEnd = System.currentTimeMillis();
+    System.out.println("Database call for surrounding words: " + (dbEnd - dbStart) + " ms");
+
+    // Measure snippet creation time
+    long snippetStart = System.currentTimeMillis();
+    for (RankedDocument doc : documents) {
+      Map<Integer, String> wordMap = surroundingWords.getOrDefault(doc.getDocId(), Collections.emptyMap());
+
+      if (wordMap.isEmpty()) {
+        doc.setSnippet(doc.getDescription());
+        continue;
+      }
+
+      // Sort positions
+      List<Integer> positions = new ArrayList<>(wordMap.keySet());
+      Collections.sort(positions);
+
+      // Build snippet with highlighted terms
+      StringBuilder snippet = new StringBuilder("... ");
+      Set<String> queryLower = queryTerms.stream()
+              .map(String::toLowerCase)
+              .collect(Collectors.toSet());
+
+      for (Integer pos : positions) {
+        String word = wordMap.get(pos);
+        if (queryLower.contains(word.toLowerCase())) {
+          snippet.append("<b>").append(word).append("</b> ");
+        } else {
+          snippet.append(word).append(" ");
+        }
+      }
+      snippet.append("...");
+
+      doc.setSnippet(snippet.toString());
+    }
+    long snippetEnd = System.currentTimeMillis();
+    System.out.println("Snippet creation time: " + (snippetEnd - snippetStart) + " ms");
+
+    long totalEnd = System.currentTimeMillis();
+    System.out.println("Total snippet generation time: " + (totalEnd - totalStart) + " ms");
+  }
+  }
+
