@@ -16,6 +16,11 @@ public class Tokenizer {
     this.stopWordsFilter = stopWordsFilter;
   }
 
+  public Tokenizer() {
+    this.stemmer = new Stemmer();
+    this.stopWordsFilter = new StopWordsFilter();
+  }
+
   public int tokenizeWithPositions(
       String text,
       int startPos,
@@ -42,5 +47,15 @@ public class Tokenizer {
     }
 
     return pos;
+  }
+
+  public void tokenizeQuery(String query, List<String> tokens, List<String> stems) {
+    String[] words = query.toLowerCase().split("\\W+");
+    for (String word : words) {
+      if (!(word.isEmpty() || stopWordsFilter.isStopWord(word))) {
+        tokens.add(word);
+        stems.add(stemmer.stem(word));
+      }
+    }
   }
 }
