@@ -27,10 +27,6 @@ public class Application {
           break;
         case "serve":
           DatabaseHelper databaseHelper = context.getBean(DatabaseHelper.class);
-          System.out.println("Populating IDF...");
-          databaseHelper.calculateIDF();
-          System.out.println("Populating FTS...");
-          databaseHelper.populateFtsTable();
           System.out.println("Ready to serve");
           break;
 
@@ -53,7 +49,7 @@ public class Application {
 
           long startTime = System.currentTimeMillis();
           // stop words are bottlenecks
-          List<String> queryTerms = Arrays.asList("machine", "learning");
+          List<String> queryTerms = Arrays.asList("i", "want", "to", "learn", "machine", "learning");
           List<RankedDocument> ranked = ranker.rank(queryTerms, false, 3, 20);
           long endTime = System.currentTimeMillis();
           long duration = endTime - startTime;
@@ -61,9 +57,9 @@ public class Application {
           System.out.println("Ranked documents number :" + ranked.size());
           System.out.println(
               "Ranked document first with url: "
-                  + ranked.get(2).getUrl()
+                  + ranked.get(0).getUrl()
                   + " with title "
-                  + ranked.get(2).getTitle());
+                  + ranked.get(0).getTitle());
           break;
 
         default:
