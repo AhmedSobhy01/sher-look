@@ -42,6 +42,7 @@ class RankerTests {
                 "https://example.com",
                 "AI Guide",
                 100,
+                "description",
                 Map.of("title", Arrays.asList(5, 10))), // 2x in title
             new DocumentTerm(
                 "learning",
@@ -49,6 +50,7 @@ class RankerTests {
                 "https://example.com",
                 "AI Guide",
                 100,
+                "description",
                 Map.of("body", Arrays.asList(11))), // 1x in body
             new DocumentTerm(
                 "machine",
@@ -56,6 +58,7 @@ class RankerTests {
                 "https://example2.com",
                 "Tech Blog",
                 50,
+                "description",
                 Map.of("body", Arrays.asList(3))), // 1x in body
             new DocumentTerm(
                 "learning",
@@ -63,6 +66,7 @@ class RankerTests {
                 "https://example2.com",
                 "Tech Blog",
                 50,
+                "description",
                 Map.of("header", Arrays.asList(4))), // 1x in header
             new DocumentTerm(
                 "machine",
@@ -70,11 +74,13 @@ class RankerTests {
                 "https://example3.com",
                 "ML Intro",
                 200,
+                "description",
                 Map.of("body", Arrays.asList(7))) // 1x in body
             );
     when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
-    List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, false);
+
+    List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, documentTerms);
 
     assertEquals(3, result.size(), "Should return three documents");
     Map<Integer, RankedDocument> docsById =
