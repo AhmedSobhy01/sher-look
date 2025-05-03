@@ -77,7 +77,6 @@ class RankerTests {
                 "description",
                 Map.of("body", Arrays.asList(7))) // 1x in body
             );
-    when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
     List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, documentTerms);
 

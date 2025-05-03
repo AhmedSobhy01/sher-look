@@ -7,7 +7,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +23,7 @@ public class SearchController {
 
   private final Map<String, Ranker.RankingResult> rankingCache = new HashMap<>();
   private final Map<String, Long> cacheTimestamps = new HashMap<>();
-  private static final long CACHE_EXPIRY_MS = 300000; // 5 minutes
+  private static final long CACHE_EXPIRY_MS = 120000; // 2 minutes
 
   @Autowired
   public SearchController(QueryProcessor queryProcessor, Ranker ranker) {
@@ -47,8 +50,15 @@ public class SearchController {
 
     String cacheKey = getCacheKey(searchTerms, isPhraseSearch);
 
+    if (rankingCache.containsKey(cacheKey)) {
+      long timestamp = cacheTimestamps.getOrDefault(cacheKey, 0L);
+      if (System.currentTimeMillis() - timestamp < CACHE_EXPIRY_MS) {
+        Ranker.RankingResult cachedResult = rankingCache.get(cacheKey);
+        return ranker.getPageWithSnippets(cachedResult, searchTerms, offset, resultsPerPage);
+      }
+    }
+    //cache miss or expired
     Ranker.RankingResult result = ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
-
     rankingCache.put(cacheKey, result);
     cacheTimestamps.put(cacheKey, System.currentTimeMillis());
 
@@ -88,6 +98,20 @@ public class SearchController {
       return Arrays.asList(queryProcessor.getPhrases()[0].split("\\s+"));
     } else {
       return queryProcessor.getTokens();
+    }
+  }
+
+  @Scheduled(fixedRate = 60000) // Run every minute
+  public void cleanupExpiredCache() {
+    long currentTime = System.currentTimeMillis();
+    List<String> keysToRemove = cacheTimestamps.entrySet().stream()
+            .filter(entry -> currentTime - entry.getValue() >= CACHE_EXPIRY_MS)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+
+    for (String key : keysToRemove) {
+      rankingCache.remove(key);
+      cacheTimestamps.remove(key);
     }
   }
 }
