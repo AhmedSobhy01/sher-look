@@ -24,10 +24,6 @@ public class Application {
           break;
         case "serve":
           DatabaseHelper databaseHelper = context.getBean(DatabaseHelper.class);
-          System.out.println("Populating IDF...");
-          databaseHelper.calculateIDF();
-          System.out.println("Populating FTS...");
-          databaseHelper.populateFtsTable();
           System.out.println("Ready to serve");
           break;
 

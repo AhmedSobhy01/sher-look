@@ -147,6 +147,18 @@ public class Indexer {
               + ((elapsed / 1000) % 60)
               + " seconds");
 
+      startTime = System.currentTimeMillis();
+      databaseHelper.calculateIDF();
+      elapsed = System.currentTimeMillis() - startTime;
+
+      ConsoleColors.printSuccess("Indexer");
+      System.out.println(
+              "IDF calculation completed in "
+                      + ((elapsed / 1000) / 60)
+                      + " minutes and "
+                      + ((elapsed / 1000) % 60)
+                      + " seconds");
+
       ConsoleColors.printSuccess("Indexer");
       System.out.println("All done!");
     } catch (SQLException e) {
