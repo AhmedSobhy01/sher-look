@@ -9,7 +9,8 @@ public class RankedDocument {
   private final double tfIdf;
   private double finalScore = 0.0;
 
-  public RankedDocument(int documentId, String url, String title, double tfIdf, String description) {
+  public RankedDocument(
+      int documentId, String url, String title, double tfIdf, String description) {
     this.documentId = documentId;
     this.url = url;
     this.title = title;
@@ -33,17 +34,17 @@ public class RankedDocument {
     return tfIdf;
   }
 
-    public String getSnippet() {
-        return snippet;
-    }
+  public String getSnippet() {
+    return snippet;
+  }
 
-    public void setSnippet(String snippet) {
-            this.snippet = snippet;
-        }
+  public void setSnippet(String snippet) {
+    this.snippet = snippet;
+  }
 
-    public String getDescription() {
-        return description;
-    }
+  public String getDescription() {
+    return description;
+  }
 
   public double getFinalScore() {
     return finalScore;

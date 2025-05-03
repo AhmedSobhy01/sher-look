@@ -42,9 +42,9 @@ public class DocumentTerm {
     return documentSize;
   }
 
-    public String getDescription() {
-        return description;
-    }
+  public String getDescription() {
+    return description;
+  }
 
   public String getUrl() {
     return url;
@@ -69,13 +69,18 @@ public class DocumentTerm {
     private final Map<String, List<Integer>> positionsBySection;
 
     public DocumentTermBuilder(
-        String word, int documentId, String url, String title, int documentSize, String description) {
+        String word,
+        int documentId,
+        String url,
+        String title,
+        int documentSize,
+        String description) {
       this.word = word;
       this.documentId = documentId;
       this.url = url;
       this.title = title;
       this.documentSize = documentSize;
-        this.description = description;
+      this.description = description;
       this.positionsBySection = new HashMap<String, List<Integer>>();
     }
 
@@ -84,7 +89,8 @@ public class DocumentTerm {
     }
 
     public DocumentTerm build() {
-      return new DocumentTerm(word, documentId, url, title, documentSize, description, positionsBySection);
+      return new DocumentTerm(
+          word, documentId, url, title, documentSize, description, positionsBySection);
     }
   }
 }

@@ -342,7 +342,8 @@ public class DatabaseHelper {
                                 docId,
                                 rs.getString("url"),
                                 rs.getString("title"),
-                                rs.getInt("document_size"), description);
+                                rs.getInt("document_size"),
+                                description);
                           } catch (SQLException e) {
                             throw new RuntimeException(e);
                           }
@@ -511,15 +512,17 @@ public class DatabaseHelper {
     batchInsertDocumentWords(documentId, words, stems, positions, sections);
   }
 
-  public Map<Integer, Map<Integer, String>> getWordsAroundPositions(Map<Integer, List<Integer>> docPositions, int windowSize) {
+  public Map<Integer, Map<Integer, String>> getWordsAroundPositions(
+      Map<Integer, List<Integer>> docPositions, int windowSize) {
     if (docPositions.isEmpty()) {
       return Collections.emptyMap();
     }
 
     // Build dynamic query with parameters
-    StringBuilder sql = new StringBuilder(
-            "SELECT dw.document_id, dw.position, w.word FROM document_words dw " +
-                    "JOIN words w ON dw.word_id = w.id WHERE ");
+    StringBuilder sql =
+        new StringBuilder(
+            "SELECT dw.document_id, dw.position, w.word FROM document_words dw "
+                + "JOIN words w ON dw.word_id = w.id WHERE ");
 
     List<Object> params = new ArrayList<>();
     boolean first = true;
@@ -542,27 +545,24 @@ public class DatabaseHelper {
     Map<Integer, Map<Integer, String>> result = new HashMap<>();
 
     this.jdbcTemplate.query(
-            sql.toString(),
-            ps -> {
-              for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
-              }
-            },
-            (ResultSetExtractor<Void>) rs -> {
+        sql.toString(),
+        ps -> {
+          for (int i = 0; i < params.size(); i++) {
+            ps.setObject(i + 1, params.get(i));
+          }
+        },
+        (ResultSetExtractor<Void>)
+            rs -> {
               while (rs.next()) {
                 int docId = rs.getInt("document_id");
                 int position = rs.getInt("position");
                 String word = rs.getString("word");
 
-                result.computeIfAbsent(docId, k -> new HashMap<>())
-                        .put(position, word);
+                result.computeIfAbsent(docId, k -> new HashMap<>()).put(position, word);
               }
               return null;
             });
 
     return result;
   }
-
-
-
 }
