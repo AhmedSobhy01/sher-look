@@ -1,6 +1,9 @@
 package com.sherlook.search.utils;
 
-import com.sherlook.search.indexer.*;
+import com.sherlook.search.indexer.Document;
+import com.sherlook.search.indexer.DocumentWord;
+import com.sherlook.search.indexer.Section;
+import com.sherlook.search.indexer.Word;
 import com.sherlook.search.ranker.DocumentTerm;
 import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
 import com.sherlook.search.ranker.Link;
@@ -17,6 +20,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementSetter;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -301,51 +306,51 @@ public class DatabaseHelper {
 
     jdbcTemplate.query(
         sql,
-        ps -> {
-          int i = 1;
-          for (Integer wordId : wordIdToWord.keySet()) {
-            ps.setInt(i++, wordId);
-          }
-        },
-        rs -> {
-          List<DocumentTerm> result = new ArrayList<>();
+        (PreparedStatementSetter)
+            ps -> {
+              int i = 1;
+              for (Integer wordId : wordIdToWord.keySet()) {
+                ps.setInt(i++, wordId);
+              }
+            },
+        (ResultSetExtractor<Void>)
+            rs -> {
+              while (rs.next()) {
+                int docId = rs.getInt("document_id");
+                int wordId = rs.getInt("word_id");
+                String word = wordIdToWord.get(wordId);
+                String section = rs.getString("section");
+                String positionsStr = rs.getString("positions");
+                List<Integer> positions = new ArrayList<>();
+                if (positionsStr != null && !positionsStr.isEmpty()) {
+                  positions =
+                      Arrays.stream(positionsStr.split(","))
+                          .map(String::trim)
+                          .map(Integer::parseInt)
+                          .collect(Collectors.toList());
+                }
 
-          while (rs.next()) {
-            int docId = rs.getInt("document_id");
-            int wordId = rs.getInt("word_id");
-            String word = wordIdToWord.get(wordId);
-            String section = rs.getString("section");
-            String positionsStr = rs.getString("positions");
-            List<Integer> positions = new ArrayList<>();
-            if (positionsStr != null && !positionsStr.isEmpty()) {
-              positions =
-                  Arrays.stream(positionsStr.split(","))
-                      .map(String::trim)
-                      .map(Integer::parseInt)
-                      .collect(Collectors.toList());
-            }
+                Pair<Integer, Integer> key = Pair.of(docId, wordId);
+                DocumentTermBuilder builder =
+                    builders.computeIfAbsent(
+                        key,
+                        k -> {
+                          try {
+                            return new DocumentTermBuilder(
+                                word,
+                                docId,
+                                rs.getString("url"),
+                                rs.getString("title"),
+                                rs.getInt("document_size"));
+                          } catch (SQLException e) {
+                            throw new RuntimeException(e);
+                          }
+                        });
 
-            Pair<Integer, Integer> key = Pair.of(docId, wordId);
-            DocumentTermBuilder builder =
-                builders.computeIfAbsent(
-                    key,
-                    k -> {
-                      try {
-                        return new DocumentTermBuilder(
-                            word,
-                            docId,
-                            rs.getString("url"),
-                            rs.getString("title"),
-                            rs.getInt("document_size"));
-                      } catch (SQLException e) {
-                        throw new RuntimeException(e);
-                      }
-                    });
-
-            builder.addPositions(section, positions);
-          }
-          return null;
-        });
+                builder.addPositions(section, positions);
+              }
+              return null;
+            });
 
     return builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
   }
@@ -366,7 +371,8 @@ public class DatabaseHelper {
   }
 
   public int getTotalDocumentCount() {
-    return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM documents", Integer.class);
+    Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM documents", Integer.class);
+    return count != null ? count : 0;
   }
 
   public List<Link> getLinks() {
@@ -434,18 +440,21 @@ public class DatabaseHelper {
     Map<Integer, Double> pageRankMap = new HashMap<>();
     jdbcTemplate.query(
         sql,
-        ps -> {
-          for (int i = 0; i < docIds.size(); i++) {
-            ps.setInt(i + 1, docIds.get(i));
-          }
-        },
-        rs -> {
-          while (rs.next()) {
-            int documentId = rs.getInt("id");
-            double pageRank = rs.getDouble("page_rank");
-            pageRankMap.put(documentId, pageRank);
-          }
-        });
+        (PreparedStatementSetter)
+            ps -> {
+              for (int i = 0; i < docIds.size(); i++) {
+                ps.setInt(i + 1, docIds.get(i));
+              }
+            },
+        (ResultSetExtractor<Void>)
+            rs -> {
+              while (rs.next()) {
+                int documentId = rs.getInt("id");
+                double pageRank = rs.getDouble("page_rank");
+                pageRankMap.put(documentId, pageRank);
+              }
+              return null;
+            });
     return pageRankMap;
   }
 
