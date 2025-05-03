@@ -79,7 +79,6 @@ class RankerTests {
             );
     when(databaseHelper.getDocumentTerms(queryTerms)).thenReturn(documentTerms);
 
-
     List<RankedDocument> result = ranker.getDocumentTfIdf(queryTerms, documentTerms);
 
     assertEquals(3, result.size(), "Should return three documents");
