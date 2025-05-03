@@ -7,6 +7,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.sherlook.search.utils.ConsoleColors;
+import com.sherlook.search.utils.DatabaseHelper;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,12 +30,33 @@ public class Ranker {
   private static final double TF_IDF_CONTRIBUTION = 0.7;
   private static final double PAGE_RANK_CONTRIBUTION = 0.3;
 
+  // for optimization, helps me avoid two getDocumentTerms db calls, the most
+  // expensive one
+  public static class RankingResult {
+    private final List<RankedDocument> rankedDocuments;
+    private final List<DocumentTerm> documentTerms;
+
+    public RankingResult(List<RankedDocument> rankedDocuments, List<DocumentTerm> documentTerms) {
+      this.rankedDocuments = rankedDocuments;
+      this.documentTerms = documentTerms;
+    }
+
+    public List<RankedDocument> getRankedDocuments() {
+      return rankedDocuments;
+    }
+
+    public List<DocumentTerm> getDocumentTerms() {
+      return documentTerms;
+    }
+  }
+
   @Autowired
   public Ranker(DatabaseHelper databaseHelper) {
     this.databaseHelper = databaseHelper;
   }
 
-  public List<RankedDocument> getDocumentTfIdf(List<String> queryTerms, List<DocumentTerm> documentTerms) {
+  public List<RankedDocument> getDocumentTfIdf(
+      List<String> queryTerms, List<DocumentTerm> documentTerms) {
 
     // get idf
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
@@ -65,7 +89,12 @@ public class Ranker {
         tfIdfSum += weightedTf * idf;
       }
       rankedDocs.add(
-          new RankedDocument(docId, firstTerm.getUrl(), firstTerm.getTitle(), tfIdfSum, firstTerm.getDescription()));
+          new RankedDocument(
+              docId,
+              firstTerm.getUrl(),
+              firstTerm.getTitle(),
+              tfIdfSum,
+              firstTerm.getDescription()));
     }
 
     return rankedDocs;
@@ -161,10 +190,13 @@ public class Ranker {
     System.out.println("PageRank scores updated in the database");
   }
 
-  public List<RankedDocument> getDocumentTfIdfPhrases(List<String> queryTerms, List<DocumentTerm> documentTerms) {
+  public List<RankedDocument> getDocumentTfIdfPhrases(
+      List<String> queryTerms, List<DocumentTerm> documentTerms) {
 
     Map<String, Double> idfMap = databaseHelper.getIDF(queryTerms);
 
+    Map<Integer, List<DocumentTerm>> docGroups = documentTerms.stream()
+        .collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
     Map<Integer, List<DocumentTerm>> docGroups = documentTerms.stream()
         .collect(Collectors.groupingBy(DocumentTerm::getDocumentId));
 
@@ -174,9 +206,7 @@ public class Ranker {
       int docId = entry.getKey();
       List<DocumentTerm> terms = entry.getValue();
 
-      Set<String> foundTermsSet = terms.stream()
-          .map(DocumentTerm::getWord)
-          .collect(Collectors.toSet());
+      Set<String> foundTermsSet = terms.stream().map(DocumentTerm::getWord).collect(Collectors.toSet());
 
       if (!foundTermsSet.containsAll(queryTerms)) {
         continue; // Skip if document doesn't contain all query terms
@@ -187,8 +217,13 @@ public class Ranker {
       // Check if the terms appear as a phrase in any section
       if (containsPhrase(terms, queryTerms)) {
         double score = calculatePhraseScore(terms, idfMap);
-        rankedDocs.add(new RankedDocument(docId, firstTerm.getUrl(),
-            firstTerm.getTitle(), score, firstTerm.getDescription()));
+        rankedDocs.add(
+            new RankedDocument(
+                docId,
+                firstTerm.getUrl(),
+                firstTerm.getTitle(),
+                score,
+                firstTerm.getDescription()));
       }
     }
 
@@ -206,8 +241,9 @@ public class Ranker {
     for (String section : terms.get(0).getPositionsBySection().keySet()) {
       // Ensure all query terms exist in this section
       boolean allTermsExist = queryTerms.stream()
-          .allMatch(queryTerm -> termMap.containsKey(queryTerm) &&
-              termMap.get(queryTerm).getPositionsBySection().containsKey(section));
+          .allMatch(
+              queryTerm -> termMap.containsKey(queryTerm)
+                  && termMap.get(queryTerm).getPositionsBySection().containsKey(section));
 
       if (allTermsExist && hasConsecutivePositions(termMap, queryTerms, section)) {
         return true;
@@ -232,9 +268,9 @@ public class Ranker {
       // Check if subsequent terms are at consecutive positions
       for (int i = 1; i < queryTerms.size(); i++) {
         DocumentTerm nextTerm = termMap.get(queryTerms.get(i));
-        if (nextTerm == null ||
-            !nextTerm.getPositionsBySection().containsKey(section) ||
-            nextTerm.getPositionsBySection().get(section) == null) {
+        if (nextTerm == null
+            || !nextTerm.getPositionsBySection().containsKey(section)
+            || nextTerm.getPositionsBySection().get(section) == null) {
           phraseFound = false;
           break;
         }
@@ -277,24 +313,19 @@ public class Ranker {
     return score;
   }
 
-  /**
-   * This method is the interface for the search engine to rank documents based on
-   * the query terms.
-   * It combines the TF-IDF score and PageRank score to produce a final ranking.
-   *
-   * @param queryTerms
-   * @param isPhraseSearch
-   * @return List of ranked documents
-   */
-  public List<RankedDocument> rank(
-      List<String> queryTerms, Boolean isPhraseSearch, int offset, int limit) {
+  public RankingResult rankAndStoreTotalDocuments(List<String> queryTerms, Boolean isPhraseSearch) {
+    long start = System.currentTimeMillis();
+
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
+
     List<RankedDocument> tfIdfDocs;
     if (isPhraseSearch) {
       tfIdfDocs = getDocumentTfIdfPhrases(queryTerms, documentTerms);
     } else {
       tfIdfDocs = getDocumentTfIdf(queryTerms, documentTerms);
     }
+
+    // Apply PageRank
     List<Integer> docIds = tfIdfDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
     Map<Integer, Double> pageRankScores = databaseHelper.getPageRank(docIds);
 
@@ -304,29 +335,26 @@ public class Ranker {
       double finalScore = TF_IDF_CONTRIBUTION * tfIdfScore + PAGE_RANK_CONTRIBUTION * pageRankScore;
       doc.setFinalScore(finalScore);
     }
+
+    // Sort by final score
     tfIdfDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));
 
-    int endIndex = Math.min(offset + limit, tfIdfDocs.size());
-    List<RankedDocument> pagedResults = offset < tfIdfDocs.size() ? tfIdfDocs.subList(offset, endIndex)
-        : new ArrayList<>();
+    long end = System.currentTimeMillis();
+    System.out.println("Ranking time: " + (end - start) + " ms");
 
-    double start = System.currentTimeMillis();
-    // Generate snippets only for paginated results
-    if (!pagedResults.isEmpty()) {
-      generateSnippets(pagedResults, documentTerms, queryTerms);
-    }
-    double end = System.currentTimeMillis();
-    System.out.println("Snippet generation time: " + (end - start) + " ms");
-
-    return pagedResults;
+    return new RankingResult(tfIdfDocs, documentTerms);
   }
 
-  private void generateSnippets(List<RankedDocument> documents, List<DocumentTerm> allDocTerms,
-      List<String> queryTerms) {
+  private void generateSnippets(
+      List<RankedDocument> documents, List<DocumentTerm> allDocTerms, List<String> queryTerms) {
     long totalStart = System.currentTimeMillis();
 
     // Measure time for filtering documents
     long filterStart = System.currentTimeMillis();
+    Set<Integer> docIds = documents.stream().map(RankedDocument::getDocId).collect(Collectors.toSet());
+    List<DocumentTerm> relevantTerms = allDocTerms.stream()
+        .filter(term -> docIds.contains(term.getDocumentId()))
+        .collect(Collectors.toList());
     Set<Integer> docIds = documents.stream().map(RankedDocument::getDocId).collect(Collectors.toSet());
     List<DocumentTerm> relevantTerms = allDocTerms.stream()
         .filter(term -> docIds.contains(term.getDocumentId()))
@@ -362,6 +390,7 @@ public class Ranker {
     // Measure database call time
     long dbStart = System.currentTimeMillis();
     Map<Integer, Map<Integer, String>> surroundingWords = databaseHelper.getWordsAroundPositions(docPositions, 10);
+    Map<Integer, Map<Integer, String>> surroundingWords = databaseHelper.getWordsAroundPositions(docPositions, 10);
     long dbEnd = System.currentTimeMillis();
     System.out.println("Database call for surrounding words: " + (dbEnd - dbStart) + " ms");
 
@@ -381,9 +410,7 @@ public class Ranker {
 
       // Build snippet with highlighted terms
       StringBuilder snippet = new StringBuilder("... ");
-      Set<String> queryLower = queryTerms.stream()
-          .map(String::toLowerCase)
-          .collect(Collectors.toSet());
+      Set<String> queryLower = queryTerms.stream().map(String::toLowerCase).collect(Collectors.toSet());
 
       for (Integer pos : positions) {
         String word = wordMap.get(pos);
@@ -402,5 +429,20 @@ public class Ranker {
 
     long totalEnd = System.currentTimeMillis();
     System.out.println("Total snippet generation time: " + (totalEnd - totalStart) + " ms");
+  }
+
+  public List<RankedDocument> getPageWithSnippets(
+      RankingResult result, List<String> queryTerms, int offset, int limit) {
+    List<RankedDocument> allDocs = result.getRankedDocuments();
+    List<DocumentTerm> documentTerms = result.getDocumentTerms();
+
+    int endIndex = Math.min(offset + limit, allDocs.size());
+    List<RankedDocument> pagedResults = offset < allDocs.size() ? allDocs.subList(offset, endIndex) : new ArrayList<>();
+
+    if (!pagedResults.isEmpty()) {
+      generateSnippets(pagedResults, documentTerms, queryTerms);
+    }
+
+    return pagedResults;
   }
 }

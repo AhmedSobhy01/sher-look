@@ -23,6 +23,7 @@ public class Application {
           indexer.index();
           break;
         case "serve":
+          System.out.println("Initializing DatabaseHelper...");
           DatabaseHelper databaseHelper = context.getBean(DatabaseHelper.class);
           System.out.println("Ready to serve");
           break;
