@@ -102,6 +102,7 @@ public class CrawlTask implements Runnable {
       System.out.println("Crawling URL: " + urlToCrawl);
       Connection conn = Jsoup.connect(urlToCrawl);
       conn = conn.timeout(2000);
+      conn = conn.userAgent("sher-look-crawler");
       Document doc = conn.get();
       if (conn.response().statusCode() == 200) {
         ConsoleColors.printSuccess(crawlTaskString);
