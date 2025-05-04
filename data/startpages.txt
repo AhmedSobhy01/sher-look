@@ -13,7 +13,6 @@ https://www.coursera.org 0
 https://www.edx.org 0
 https://www.pluralsight.com 0
 https://www.udacity.com 0
-https://www.w3schools.com 0
 https://developer.mozilla.org 0
 https://www.tutorialspoint.com 0
 https://www.javatpoint.com 0
