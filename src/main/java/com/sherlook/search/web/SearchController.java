@@ -66,7 +66,8 @@ public class SearchController {
       long timestamp = cacheTimestamps.getOrDefault(cacheKey, 0L);
       if (System.currentTimeMillis() - timestamp < CACHE_EXPIRY_MS) {
         rankingResult = rankingCache.get(cacheKey);
-        results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
+        results =
+            ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage, false);
         return createResponse(
             results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
       }
@@ -77,7 +78,7 @@ public class SearchController {
     rankingCache.put(cacheKey, rankingResult);
     cacheTimestamps.put(cacheKey, System.currentTimeMillis());
 
-    results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
+    results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage, false);
     return createResponse(
         results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
   }

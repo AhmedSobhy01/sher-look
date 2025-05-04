@@ -365,7 +365,10 @@ public class Ranker {
   }
 
   private void generateSnippets(
-      List<RankedDocument> documents, List<DocumentTerm> allDocTerms, List<String> queryTerms) {
+      List<RankedDocument> documents,
+      List<DocumentTerm> allDocTerms,
+      List<String> queryTerms,
+      boolean isPhraseSearch) {
     long totalStart = System.currentTimeMillis();
 
     // Measure time for filtering documents
@@ -383,22 +386,46 @@ public class Ranker {
     long positionStart = System.currentTimeMillis();
     Map<Integer, List<Integer>> docPositions = new HashMap<>();
 
+    // Group terms by document for phrase processing
+    Map<Integer, Map<String, DocumentTerm>> docTermsMap = new HashMap<>();
     for (DocumentTerm term : relevantTerms) {
       int docId = term.getDocumentId();
+      docTermsMap.computeIfAbsent(docId, k -> new HashMap<>()).put(term.getWord(), term);
+    }
 
-      // Find earliest position across all sections
-      int earliestPos = Integer.MAX_VALUE;
-      for (List<Integer> positions : term.getPositionsBySection().values()) {
-        if (!positions.isEmpty()) {
-          int minPos = Collections.min(positions);
-          if (minPos < earliestPos) {
-            earliestPos = minPos;
+    if (isPhraseSearch) {
+      for (Map.Entry<Integer, Map<String, DocumentTerm>> entry : docTermsMap.entrySet()) {
+        int docId = entry.getKey();
+        Map<String, DocumentTerm> termMap = entry.getValue();
+
+        // Check if document has all query terms
+        if (queryTerms.stream().allMatch(termMap::containsKey)) {
+          for (String section : SECTION_WEIGHTS.keySet()) {
+            List<Integer> phrasePositions = findPhrasePositions(termMap, queryTerms, section);
+            if (!phrasePositions.isEmpty()) {
+              docPositions.computeIfAbsent(docId, k -> new ArrayList<>()).addAll(phrasePositions);
+            }
           }
         }
       }
+    } else {
+      for (DocumentTerm term : relevantTerms) {
+        int docId = term.getDocumentId();
 
-      if (earliestPos != Integer.MAX_VALUE) {
-        docPositions.computeIfAbsent(docId, k -> new ArrayList<>()).add(earliestPos);
+        // Find earliest position across all sections
+        int earliestPos = Integer.MAX_VALUE;
+        for (List<Integer> positions : term.getPositionsBySection().values()) {
+          if (!positions.isEmpty()) {
+            int minPos = Collections.min(positions);
+            if (minPos < earliestPos) {
+              earliestPos = minPos;
+            }
+          }
+        }
+
+        if (earliestPos != Integer.MAX_VALUE) {
+          docPositions.computeIfAbsent(docId, k -> new ArrayList<>()).add(earliestPos);
+        }
       }
     }
     long positionEnd = System.currentTimeMillis();
@@ -406,8 +433,9 @@ public class Ranker {
 
     // Measure database call time
     long dbStart = System.currentTimeMillis();
+    int contextWindow = isPhraseSearch ? 15 : 10;
     Map<Integer, Map<Integer, String>> surroundingWords =
-        databaseHelper.getWordsAroundPositions(docPositions, 10);
+        databaseHelper.getWordsAroundPositions(docPositions, contextWindow);
     long dbEnd = System.currentTimeMillis();
     System.out.println("Database call for surrounding words: " + (dbEnd - dbStart) + " ms");
 
@@ -431,12 +459,16 @@ public class Ranker {
       Set<String> queryLower =
           queryTerms.stream().map(String::toLowerCase).collect(Collectors.toSet());
 
-      for (Integer pos : positions) {
-        String word = wordMap.get(pos);
-        if (queryLower.contains(word.toLowerCase())) {
-          snippet.append("<b>").append(word).append("</b> ");
-        } else {
-          snippet.append(word).append(" ");
+      if (isPhraseSearch) {
+        highlightPhrase(snippet, positions, wordMap, queryTerms);
+      } else {
+        for (Integer pos : positions) {
+          String word = wordMap.get(pos);
+          if (queryLower.contains(word.toLowerCase())) {
+            snippet.append("<b>").append(word).append("</b> ");
+          } else {
+            snippet.append(word).append(" ");
+          }
         }
       }
       snippet.append("...");
@@ -450,8 +482,102 @@ public class Ranker {
     System.out.println("Total snippet generation time: " + (totalEnd - totalStart) + " ms");
   }
 
+  private List<Integer> findPhrasePositions(
+      Map<String, DocumentTerm> termMap, List<String> queryTerms, String section) {
+    List<Integer> phraseStartPositions = new ArrayList<>();
+
+    // Get the first term in the phrase
+    DocumentTerm firstTerm = termMap.get(queryTerms.get(0));
+    if (firstTerm == null || !firstTerm.getPositionsBySection().containsKey(section)) {
+      return phraseStartPositions;
+    }
+
+    List<Integer> firstTermPositions = firstTerm.getPositionsBySection().get(section);
+
+    // For each position of the first term, check if it starts a phrase
+    for (int startPos : firstTermPositions) {
+      boolean isPhrase = true;
+
+      for (int i = 1; i < queryTerms.size(); i++) {
+        DocumentTerm nextTerm = termMap.get(queryTerms.get(i));
+        if (nextTerm == null
+            || !nextTerm.getPositionsBySection().containsKey(section)
+            || !nextTerm.getPositionsBySection().get(section).contains(startPos + i)) {
+          isPhrase = false;
+          break;
+        }
+      }
+
+      if (isPhrase) {
+        phraseStartPositions.add(startPos);
+      }
+    }
+
+    return phraseStartPositions;
+  }
+
+  private void highlightPhrase(
+      StringBuilder snippet,
+      List<Integer> positions,
+      Map<Integer, String> wordMap,
+      List<String> queryTerms) {
+
+    int phraseLength = queryTerms.size();
+    boolean phraseFound = false;
+
+    for (int i = 0; i < positions.size(); i++) {
+      int currentPos = positions.get(i);
+
+      boolean isPhrase = true;
+      for (int j = 1; j < phraseLength && i + j < positions.size(); j++) {
+        if (positions.get(i + j) != currentPos + j) {
+          isPhrase = false;
+          break;
+        }
+      }
+
+      if (isPhrase && i + phraseLength <= positions.size()) {
+        for (int j = 0; j < i; j++) {
+          snippet.append(wordMap.get(positions.get(j))).append(" ");
+        }
+
+        snippet.append("<b>");
+        for (int j = 0; j < phraseLength; j++) {
+          snippet.append(wordMap.get(positions.get(i + j)));
+          if (j < phraseLength - 1) snippet.append(" ");
+        }
+        snippet.append("</b> ");
+
+        for (int j = i + phraseLength; j < positions.size(); j++) {
+          snippet.append(wordMap.get(positions.get(j))).append(" ");
+        }
+
+        phraseFound = true;
+        break;
+      }
+    }
+
+    // fall back to individual term highlighting
+    if (!phraseFound) {
+      Set<String> queryLower =
+          queryTerms.stream().map(String::toLowerCase).collect(Collectors.toSet());
+      for (Integer pos : positions) {
+        String word = wordMap.get(pos);
+        if (queryLower.contains(word.toLowerCase())) {
+          snippet.append("<b>").append(word).append("</b> ");
+        } else {
+          snippet.append(word).append(" ");
+        }
+      }
+    }
+  }
+
   public List<RankedDocument> getPageWithSnippets(
-      RankingResult result, List<String> queryTerms, int offset, int limit) {
+      RankingResult result,
+      List<String> queryTerms,
+      int offset,
+      int limit,
+      boolean isPhraseSearch) {
     List<RankedDocument> allDocs = result.getRankedDocuments();
     List<DocumentTerm> documentTerms = result.getDocumentTerms();
 
@@ -460,7 +586,7 @@ public class Ranker {
         offset < allDocs.size() ? allDocs.subList(offset, endIndex) : new ArrayList<>();
 
     if (!pagedResults.isEmpty()) {
-      generateSnippets(pagedResults, documentTerms, queryTerms);
+      generateSnippets(pagedResults, documentTerms, queryTerms, isPhraseSearch);
     }
 
     return pagedResults;
