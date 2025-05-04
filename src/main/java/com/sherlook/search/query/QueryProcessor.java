@@ -35,6 +35,9 @@ public class QueryProcessor {
     if (query == null || query.trim().isEmpty()) {
       return;
     }
+
+    query = query.trim().toLowerCase();
+
     if (query.equals(lastQuery)) {
       return;
     } else {
