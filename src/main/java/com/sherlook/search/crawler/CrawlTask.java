@@ -162,7 +162,7 @@ public class CrawlTask implements Runnable {
           limit = 50;
           break;
         default:
-          limit = 0;
+          limit = 25;
           break;
       }
 

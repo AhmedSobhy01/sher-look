@@ -3,10 +3,7 @@ package com.sherlook.search.web;
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.ranker.RankedDocument;
 import com.sherlook.search.ranker.Ranker;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -43,20 +40,25 @@ public class SearchController {
 
     long startTime = System.currentTimeMillis();
     queryProcessor.processQuery(query);
-    List<String> searchTerms = getSearchTerms();
+    String[] phrases = queryProcessor.getPhrases();
+    int[] operators = queryProcessor.getOperators();
     boolean isPhraseSearch = queryProcessor.isPhraseMatching();
+    List<String> searchTerms = getSearchTerms();
 
-    return getSearchResults(searchTerms, isPhraseSearch, page, resultsPerPage, startTime);
+    return getSearchResults(
+        phrases, operators, isPhraseSearch, searchTerms, page, resultsPerPage, startTime);
   }
 
   private SearchResponse getSearchResults(
-      List<String> searchTerms,
+      String[] phrases,
+      int[] operators,
       boolean isPhraseSearch,
+      List<String> searchTerms,
       int page,
       int resultsPerPage,
       long startTime) {
 
-    String cacheKey = getCacheKey(searchTerms, isPhraseSearch);
+    String cacheKey = getCacheKey(searchTerms, isPhraseSearch, operators);
     int offset = (page - 1) * resultsPerPage;
 
     List<RankedDocument> results;
@@ -73,7 +75,11 @@ public class SearchController {
     }
 
     // Cache miss or expired
-    rankingResult = ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
+    if (isPhraseSearch) {
+      rankingResult = ranker.rankAndStoreTotalDocumentsPhrases(phrases, operators);
+    } else {
+      rankingResult = ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
+    }
     rankingCache.put(cacheKey, rankingResult);
     cacheTimestamps.put(cacheKey, System.currentTimeMillis());
 
@@ -92,13 +98,40 @@ public class SearchController {
     return new SearchResponse(results, totalPages, timeMs, totalDocs);
   }
 
-  private String getCacheKey(List<String> queryTerms, Boolean isPhraseSearch) {
-    return queryTerms.isEmpty() ? "empty" : String.join(",", queryTerms) + "|" + isPhraseSearch;
+  private String getCacheKey(List<String> queryTerms, Boolean isPhraseSearch, int[] operators) {
+    if (queryTerms.isEmpty()) return "empty";
+
+    StringBuilder keyBuilder = new StringBuilder();
+    keyBuilder.append(String.join(",", queryTerms));
+    keyBuilder.append("|").append(isPhraseSearch);
+
+    if (operators != null && operators.length > 0) {
+      keyBuilder.append("|");
+      for (int i = 0; i < operators.length; i++) {
+        keyBuilder.append(operators[i]);
+        if (i < operators.length - 1) {
+          keyBuilder.append(",");
+        }
+      }
+    }
+
+    return keyBuilder.toString();
   }
 
   private List<String> getSearchTerms() {
-    if (queryProcessor.isPhraseMatching() && queryProcessor.getPhrases().length > 0) {
-      return Arrays.asList(queryProcessor.getPhrases()[0].split("\\s+"));
+    if (queryProcessor.isPhraseMatching()) {
+      // Collect all terms from non-NOT phrases for snippet generation
+      String[] phrases = queryProcessor.getPhrases();
+      int[] operators = queryProcessor.getOperators();
+      List<String> terms = new ArrayList<>();
+      for (int i = 0; i < phrases.length && phrases[i] != null; i++) {
+        // Exclude terms from NOT phrases
+        if (i > 0 && operators[i - 1] == 3) {
+          continue;
+        }
+        terms.addAll(Arrays.asList(phrases[i].split("\\s+")));
+      }
+      return terms;
     } else {
       return queryProcessor.getTokens();
     }
