@@ -37,6 +37,9 @@ public class Robots {
 
       HttpURLConnection connection = (HttpURLConnection) robotsURL.openConnection();
       connection.setRequestMethod("GET");
+      connection.setRequestProperty("User-Agent", "sher-look-cawler");
+      connection.setConnectTimeout(2000);
+      connection.setReadTimeout(2000);
       int statusCode = connection.getResponseCode();
 
       if (statusCode == HttpURLConnection.HTTP_OK) {
