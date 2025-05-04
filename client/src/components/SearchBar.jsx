@@ -52,13 +52,16 @@ export default function SearchBar({ shadow = true, value = "" }) {
         submit(formData, { method: "post" });
     };
 
-    const handleFormSubmit = () => {
-        // Save query in localStorage before submitting
-        if (query.trim()) {
-            const history = JSON.parse(localStorage.getItem("searchHistory") || "{}");
-            history[query] = (history[query] || 0) + 1;
-            localStorage.setItem("searchHistory", JSON.stringify(history));
+    const handleFormSubmit = (e) => {
+        if (!query.trim()) {
+            e.preventDefault();
+            return;
         }
+
+        // Save query in localStorage before submitting
+        const history = JSON.parse(localStorage.getItem("searchHistory") || "{}");
+        history[query] = (history[query] || 0) + 1;
+        localStorage.setItem("searchHistory", JSON.stringify(history));
     };
 
     const handleFocus = () => {

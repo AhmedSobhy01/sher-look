@@ -59,6 +59,11 @@ ResultsPage.loader = async function ({ request }) {
     const searchParams = new URL(request.url).searchParams;
     const searchTerm = searchParams.get("q");
 
+    // Redirect to home if search term is empty
+    if (!searchTerm || searchTerm.trim() === "") {
+        return redirect("/");
+    }
+
     // TODO: Fetch search results from the backend
     const dummyResponse = {
         query: searchTerm,
