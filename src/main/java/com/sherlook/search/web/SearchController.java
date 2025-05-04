@@ -37,63 +37,82 @@ public class SearchController {
 
   @GetMapping("/search")
   @ResponseBody
-  public List<RankedDocument> search(
+  public SearchResponse search(
       @RequestParam String query,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int resultsPerPage) {
 
+    long startTime = System.currentTimeMillis();
     queryProcessor.processQuery(query);
     List<String> searchTerms = getSearchTerms();
     boolean isPhraseSearch = queryProcessor.isPhraseMatching();
-    int offset = (page - 1) * resultsPerPage;
 
-    String cacheKey = getCacheKey(searchTerms, isPhraseSearch);
-
-    if (rankingCache.containsKey(cacheKey)) {
-      long timestamp = cacheTimestamps.getOrDefault(cacheKey, 0L);
-      if (System.currentTimeMillis() - timestamp < CACHE_EXPIRY_MS) {
-        Ranker.RankingResult cachedResult = rankingCache.get(cacheKey);
-        return ranker.getPageWithSnippets(cachedResult, searchTerms, offset, resultsPerPage);
-      }
-    }
-    // cache miss or expired
-    Ranker.RankingResult result = ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
-    rankingCache.put(cacheKey, result);
-    cacheTimestamps.put(cacheKey, System.currentTimeMillis());
-
-    return ranker.getPageWithSnippets(result, searchTerms, offset, resultsPerPage);
+    return getSearchResults(searchTerms, isPhraseSearch, page, resultsPerPage, startTime);
   }
 
   @GetMapping("/pagination")
   @ResponseBody
-  public List<RankedDocument> paginate(
+  public SearchResponse paginate(
       @RequestParam String query,
       @RequestParam int page,
       @RequestParam(defaultValue = "10") int resultsPerPage) {
+    long startTime = System.currentTimeMillis();
     queryProcessor.processQuery(query);
     List<String> searchTerms = getSearchTerms();
     boolean isPhraseSearch = queryProcessor.isPhraseMatching();
 
+    return getSearchResults(searchTerms, isPhraseSearch, page, resultsPerPage, startTime);
+  }
+
+  private SearchResponse getSearchResults(
+      List<String> searchTerms,
+      boolean isPhraseSearch,
+      int page,
+      int resultsPerPage,
+      long startTime) {
+
     String cacheKey = getCacheKey(searchTerms, isPhraseSearch);
+    int offset = (page - 1) * resultsPerPage;
+
+    List<RankedDocument> results;
+    Ranker.RankingResult rankingResult;
 
     if (rankingCache.containsKey(cacheKey)) {
       long timestamp = cacheTimestamps.getOrDefault(cacheKey, 0L);
       if (System.currentTimeMillis() - timestamp < CACHE_EXPIRY_MS) {
-        int offset = (page - 1) * resultsPerPage;
-        Ranker.RankingResult cachedResult = rankingCache.get(cacheKey);
-        return ranker.getPageWithSnippets(cachedResult, searchTerms, offset, resultsPerPage);
+        rankingResult = rankingCache.get(cacheKey);
+        results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
+        return createResponse(
+            results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
       }
     }
+
     // Cache miss or expired
-    return search(query, page, resultsPerPage);
+    rankingResult = ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
+    rankingCache.put(cacheKey, rankingResult);
+    cacheTimestamps.put(cacheKey, System.currentTimeMillis());
+
+    results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
+    return createResponse(
+        results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
+  }
+
+  private SearchResponse createResponse(
+      List<RankedDocument> results,
+      Ranker.RankingResult rankingResult,
+      int resultsPerPage,
+      long timeMs) {
+    int totalDocs = rankingResult.getTotalDocuments();
+    int totalPages = (int) Math.ceil((double) totalDocs / resultsPerPage);
+    return new SearchResponse(results, totalPages, timeMs, totalDocs);
   }
 
   private String getCacheKey(List<String> queryTerms, Boolean isPhraseSearch) {
-    return String.join(",", queryTerms) + "|" + isPhraseSearch;
+    return queryTerms.isEmpty() ? "empty" : String.join(",", queryTerms) + "|" + isPhraseSearch;
   }
 
   private List<String> getSearchTerms() {
-    if (queryProcessor.isPhraseMatching()) {
+    if (queryProcessor.isPhraseMatching() && queryProcessor.getPhrases().length > 0) {
       return Arrays.asList(queryProcessor.getPhrases()[0].split("\\s+"));
     } else {
       return queryProcessor.getTokens();
@@ -112,6 +131,37 @@ public class SearchController {
     for (String key : keysToRemove) {
       rankingCache.remove(key);
       cacheTimestamps.remove(key);
+    }
+  }
+
+  public static class SearchResponse {
+    private final List<RankedDocument> results;
+    private final int totalPages;
+    private final long timeMs;
+    private final int totalDocuments;
+
+    public SearchResponse(
+        List<RankedDocument> results, int totalPages, long timeMs, int totalDocuments) {
+      this.results = results;
+      this.totalPages = totalPages;
+      this.timeMs = timeMs;
+      this.totalDocuments = totalDocuments;
+    }
+
+    public List<RankedDocument> getResults() {
+      return results;
+    }
+
+    public int getTotalPages() {
+      return totalPages;
+    }
+
+    public long getTimeMs() {
+      return timeMs;
+    }
+
+    public int getTotalDocuments() {
+      return totalDocuments;
     }
   }
 }
