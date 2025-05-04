@@ -31,7 +31,10 @@ const ResultsPage = function () {
 
             <main className="max-w-3xl mr-8 ml-8 sm:ml-16 md:ml-20 lg:ml-42 pb-12">
                 <p className={`text-gray-600 text-sm mb-6 transition-all duration-300 ${isLoaded ? "animate-fade-in" : "opacity-0"}`}>
-                    About <span className="font-medium">{data.data.length}</span> results for <span className="font-medium">"{data.query}"</span>
+                    About <span className="font-medium">{data.data.length}</span> results
+                    <span className="font-medium">
+                        "{data.query}" took <span className="font-semibold">{data.timeTaken < 100 ? `${data.timeTaken}ms` : `${(data.timeTaken / 1000).toFixed(2)}s`}</span>
+                    </span>
                 </p>
 
                 <ul className="space-y-6">
@@ -59,6 +62,7 @@ ResultsPage.loader = async function ({ request }) {
     // TODO: Fetch search results from the backend
     const dummyResponse = {
         query: searchTerm,
+        timeTaken: Math.floor(Math.random() * 2000) + 100,
         data: [
             {
                 id: 2,
