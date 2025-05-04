@@ -29,7 +29,7 @@ const Homepage = function () {
 Homepage.action = async function ({ request }) {
     let formData = await request.formData();
     let query = formData.get("query");
-    if (query) return redirect(`/search?q=${query}`);
+    if (query) return redirect(`/search?query=${query}`);
 };
 
 export default Homepage;

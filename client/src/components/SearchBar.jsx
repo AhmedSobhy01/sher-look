@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Form, useSubmit, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
+import { faClockRotateLeft, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { useRef } from "react";
 
@@ -79,17 +79,15 @@ export default function SearchBar({ shadow = true, value = "" }) {
         <div className="relative w-full">
             <Form method="post" className="w-full space-y-4" onSubmit={handleFormSubmit}>
                 <div className="flex w-full space-x-2 h-12 items-start">
-                    <ul
-                        className={"border-zinc-300 border-1 flex-1 rounded-3xl bg-white" + (shadow ? " shadow-md" : "")}
-                        onFocus={handleFocus}
-                        onBlur={handleBlur}
-                        onClick={handleFocus}
-                        tabIndex="0" // Make the div focusable
-                        ref={suggestionBoxRef}
-                    >
-                        <li className="px-4 py-2 cursor-pointer flex items-center space-x-2 h-12">
+                    <ul className={"border-zinc-300 border-1 flex-1 rounded-3xl bg-white" + (shadow ? " shadow-md" : "")} onFocus={handleFocus} onBlur={handleBlur} onClick={handleFocus} tabIndex="0" ref={suggestionBoxRef}>
+                        <li className="px-4 py-2 flex items-center space-x-2 h-12">
                             <FontAwesomeIcon icon={faMagnifyingGlass} className="bg-transparent text-zinc-800 text-md" />
-                            <input name="query" type="search" placeholder="Search anything..." value={query} onChange={handleInputChange} className="focus:outline-none w-full" ref={inputRef} />
+                            <input name="query" type="text" placeholder="Search anything..." value={query} onChange={handleInputChange} className="focus:outline-none w-full" ref={inputRef} />
+                            {query && (
+                                <button type="button" onClick={() => setQuery("")} className="ml-2 text-zinc-500 hover:text-zinc-700 focus:outline-none cursor-pointer">
+                                    <FontAwesomeIcon icon={faXmark} className="text-zinc-800 text-md" />
+                                </button>
+                            )}
                         </li>
                         {isFocused && suggestions.length > 0 && (
                             <>
