@@ -4,6 +4,7 @@ import { useLoaderData } from "react-router";
 import Logo from "@/assets/Logo.png";
 import { useNavigate } from "react-router";
 import HighlightText from "@/components/HighlightedText";
+import { redirect } from "react-router-dom";
 
 const ResultsPage = function () {
   const navigate = useNavigate();
@@ -127,6 +128,12 @@ ResultsPage.loader = async function ({ request }) {
     ],
   };
   return dummyResponse;
+};
+
+ResultsPage.action = async function ({ request }) {
+  let formData = await request.formData();
+  let query = formData.get("query");
+  if (query) return redirect(`/search?q=${query}`);
 };
 
 export default ResultsPage;
