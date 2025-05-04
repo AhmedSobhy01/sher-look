@@ -2,13 +2,7 @@ package com.sherlook.search.ranker;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -364,6 +358,85 @@ public class Ranker {
     return new RankingResult(tfIdfDocs, documentTerms);
   }
 
+  public RankingResult rankAndStoreTotalDocumentsPhrases(String[] phrases, int[] operators) {
+    long start = System.currentTimeMillis();
+    List<RankedDocument> finalDocs = new ArrayList<>();
+
+    // Handle phrase search with operators
+    List<DocumentTerm> allDocumentTerms = new ArrayList<>();
+    List<Set<Integer>> docIdSets = new ArrayList<>();
+
+    // Process each phrase
+    for (int i = 0; i < phrases.length && phrases[i] != null; i++) {
+      List<String> queryTerms = Arrays.asList(phrases[i].split("\\s+"));
+      List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
+      List<RankedDocument> phraseDocs = getDocumentTfIdfPhrases(queryTerms, documentTerms);
+      allDocumentTerms.addAll(documentTerms);
+      docIdSets.add(phraseDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toSet()));
+    }
+
+    // Apply logical operators
+    Set<Integer> resultDocIds = new HashSet<>();
+    if (!docIdSets.isEmpty()) {
+      resultDocIds.addAll(docIdSets.get(0)); // Start with first phrase's doc IDs
+
+      for (int i = 1; i < docIdSets.size() && i <= operators.length; i++) {
+        Set<Integer> currentDocIds = docIdSets.get(i);
+        int operator = operators[i - 1]; // Operator between phrase i-1 and i
+        switch (operator) {
+          case 1: // AND
+            resultDocIds.retainAll(currentDocIds);
+            break;
+          case 2: // OR
+            resultDocIds.addAll(currentDocIds);
+            break;
+          case 3: // NOT
+            resultDocIds.removeAll(currentDocIds);
+            break;
+          default:
+            // No operator or invalid, treat as AND
+            resultDocIds.retainAll(currentDocIds);
+            break;
+        }
+      }
+    }
+
+    // Filter documents to include only those in resultDocIds
+    Map<Integer, RankedDocument> docMap = new HashMap<>();
+    for (int i = 0; i < phrases.length && phrases[i] != null; i++) {
+      List<String> queryTerms = Arrays.asList(phrases[i].split("\\s+"));
+      List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
+      List<RankedDocument> phraseDocs = getDocumentTfIdfPhrases(queryTerms, documentTerms);
+      for (RankedDocument doc : phraseDocs) {
+        if (resultDocIds.contains(doc.getDocId())) {
+          docMap.putIfAbsent(doc.getDocId(), doc);
+        }
+      }
+    }
+
+    finalDocs.addAll(docMap.values());
+
+    // Apply PageRank
+    List<Integer> docIds =
+        finalDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toList());
+    Map<Integer, Double> pageRankScores = databaseHelper.getPageRank(docIds);
+
+    for (RankedDocument doc : finalDocs) {
+      double tfIdfScore = doc.getTfIdf();
+      double pageRankScore = pageRankScores.getOrDefault(doc.getDocId(), 0.0);
+      double finalScore = TF_IDF_CONTRIBUTION * tfIdfScore + PAGE_RANK_CONTRIBUTION * pageRankScore;
+      doc.setFinalScore(finalScore);
+    }
+
+    // Sort by final score
+    finalDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));
+
+    long end = System.currentTimeMillis();
+    System.out.println("Ranking time: " + (end - start) + " ms");
+
+    return new RankingResult(finalDocs, allDocumentTerms);
+  }
+
   private void generateSnippets(
       List<RankedDocument> documents, List<DocumentTerm> allDocTerms, List<String> queryTerms) {
     long totalStart = System.currentTimeMillis();
@@ -386,7 +459,7 @@ public class Ranker {
     for (DocumentTerm term : relevantTerms) {
       int docId = term.getDocumentId();
 
-      // Find earliest position across all sections
+      // Find the earliest position across all sections
       int earliestPos = Integer.MAX_VALUE;
       for (List<Integer> positions : term.getPositionsBySection().values()) {
         if (!positions.isEmpty()) {
