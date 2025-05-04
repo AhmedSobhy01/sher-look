@@ -166,8 +166,11 @@ public class Ranker {
 
       // check convergence
       if (maxDiff < CONVERGENCE_THRESHOLD) {
-        ConsoleColors.printSuccess(
-            "PageRank converged after " + (i + 1) + " iterations" + " with max diff: " + maxDiff);
+        ConsoleColors.printSuccess("PageRank");
+        System.out.println("Converged after " + (i + 1) + " iterations with max diff: " + maxDiff);
+
+        ConsoleColors.printSuccess("PageRank");
+        System.out.println("Convergence threshold: " + CONVERGENCE_THRESHOLD);
         converged = true;
         break;
       }
@@ -182,13 +185,27 @@ public class Ranker {
   }
 
   public void rankPagesByPopularity() {
+    ConsoleColors.printSuccess("PageRank");
     System.out.println("Started ranking pages by popularity");
+
+    long start = System.currentTimeMillis();
+
     List<Integer> docIds = databaseHelper.getAllDocumentIds();
     List<Link> links = databaseHelper.getLinks();
     Map<Integer, Double> pageRankScores = computePageRank(docIds, links);
+
+    ConsoleColors.printSuccess("PageRank");
     System.out.println("PageRank scores computed");
+
+    ConsoleColors.printSuccess("PageRank");
+    System.out.println("Updating PageRank scores in the database");
     databaseHelper.batchUpdatePageRank(pageRankScores);
+    ConsoleColors.printSuccess("PageRank");
     System.out.println("PageRank scores updated in the database");
+
+    ConsoleColors.printSuccess("PageRank");
+    System.out.println(
+        "Ranking pages completed in " + (System.currentTimeMillis() - start) + " ms");
   }
 
   public List<RankedDocument> getDocumentTfIdfPhrases(
