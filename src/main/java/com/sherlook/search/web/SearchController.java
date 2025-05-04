@@ -1,19 +1,21 @@
 package com.sherlook.search.web;
 
-import com.sherlook.search.query.QueryProcessor;
-import com.sherlook.search.ranker.RankedDocument;
-import com.sherlook.search.ranker.Ranker;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.sherlook.search.query.QueryProcessor;
+import com.sherlook.search.ranker.RankedDocument;
+import com.sherlook.search.ranker.Ranker;
 
 @Controller
 public class SearchController {
@@ -30,11 +32,6 @@ public class SearchController {
     this.ranker = ranker;
   }
 
-  @GetMapping("/")
-  public String index() {
-    return "index";
-  }
-
   @GetMapping("/search")
   @ResponseBody
   public SearchResponse search(
@@ -42,20 +39,6 @@ public class SearchController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int resultsPerPage) {
 
-    long startTime = System.currentTimeMillis();
-    queryProcessor.processQuery(query);
-    List<String> searchTerms = getSearchTerms();
-    boolean isPhraseSearch = queryProcessor.isPhraseMatching();
-
-    return getSearchResults(searchTerms, isPhraseSearch, page, resultsPerPage, startTime);
-  }
-
-  @GetMapping("/pagination")
-  @ResponseBody
-  public SearchResponse paginate(
-      @RequestParam String query,
-      @RequestParam int page,
-      @RequestParam(defaultValue = "10") int resultsPerPage) {
     long startTime = System.currentTimeMillis();
     queryProcessor.processQuery(query);
     List<String> searchTerms = getSearchTerms();
@@ -122,11 +105,10 @@ public class SearchController {
   @Scheduled(fixedRate = 60000) // Run every minute
   public void cleanupExpiredCache() {
     long currentTime = System.currentTimeMillis();
-    List<String> keysToRemove =
-        cacheTimestamps.entrySet().stream()
-            .filter(entry -> currentTime - entry.getValue() >= CACHE_EXPIRY_MS)
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
+    List<String> keysToRemove = cacheTimestamps.entrySet().stream()
+        .filter(entry -> currentTime - entry.getValue() >= CACHE_EXPIRY_MS)
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toList());
 
     for (String key : keysToRemove) {
       rankingCache.remove(key);
