@@ -5,14 +5,16 @@ import Logo from "@/assets/Logo.png";
 import HighlightText from "@/components/HighlightedText";
 import { redirect } from "react-router-dom";
 import SkeletonLoader from "@/components/SkeletonLoader";
+import { fetchSearchResults, transformSearchResults } from "@/services/api";
 
 const ResultsPage = function () {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const [data, setData] = useState({ data: [], timeTaken: 0, query: "" });
+    const [data, setData] = useState({ data: [], timeTaken: 0, query: "", totalDocuments: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [isLoaded, setIsLoaded] = useState(false);
     const [showResults, setShowResults] = useState(false);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const searchTerm = searchParams.get("query");
@@ -24,44 +26,18 @@ const ResultsPage = function () {
 
         const fetchData = async () => {
             setIsLoading(true);
+            setError(null);
 
-            const dummyResponse = {
-                query: searchTerm,
-                timeTaken: Math.floor(Math.random() * 2000) + 100,
-                data: [
-                    {
-                        id: 2,
-                        Url: "https://www.google.com",
-                        title: "Google",
-                        description: "Search the world's information, including webpages, images, videos and more. Google has many special features to help you find exactly what you're looking for.",
-                        highlights: ["search", "information", "webpages", "images", "videos", "features", "find", "looking"],
-                    },
-                    {
-                        id: 1,
-                        Url: "https://www.bing.com",
-                        title: "Bing",
-                        description: "Bing helps you turn information into action, making it faster and easier to go from searching to doing.",
-                        highlights: ["information", "action", "making", "faster", "easier", "searching", "doing"],
-                    },
-                    {
-                        id: 4,
-                        Url: "https://www.duckduckgo.com",
-                        title: "DuckDuckGo",
-                        description: "The Internet privacy company that empowers you to seamlessly take control of your personal information online, without any tradeoffs.",
-                        highlights: ["Internet", "privacy", "company", "empowers", "seamlessly", "control", "personal", "information", "online"],
-                    },
-                    {
-                        id: 3,
-                        Url: "https://www.yahoo.com",
-                        title: "Yahoo",
-                        description: "News, email and search are just the beginning. Discover more every day. Find your yodel.",
-                        highlights: ["News", "email", "search", "beginning", "Discover", "yodel"],
-                    },
-                ],
-            };
-
-            setData(dummyResponse);
-            setIsLoading(false);
+            try {
+                const apiResponse = await fetchSearchResults(searchTerm);
+                const transformedData = transformSearchResults(apiResponse, searchTerm);
+                setData(transformedData);
+            } catch (err) {
+                console.error("Failed to fetch search results:", err);
+                setError("Failed to fetch search results. Please try again later.");
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         fetchData();
@@ -96,29 +72,38 @@ const ResultsPage = function () {
                         <div className="animate-pulse h-4 bg-gray-200 rounded w-48 mb-6"></div>
                         <SkeletonLoader count={5} />
                     </>
+                ) : error ? (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700">{error}</div>
                 ) : (
                     <>
                         <p className={`text-gray-600 text-sm mb-6 transition-all duration-300 ${isLoaded ? "animate-fade-in" : "opacity-0"}`}>
-                            About <span className="font-medium">{data.data.length}</span> results
+                            About <span className="font-medium">{data.totalDocuments || data.data.length}</span> results
                             <span className="font-medium">
                                 {" "}
                                 "{data.query}" took <span className="font-semibold">{data.timeTaken < 100 ? `${data.timeTaken}ms` : `${(data.timeTaken / 1000).toFixed(2)}s`}</span>
                             </span>
                         </p>
 
-                        <ul className="space-y-6">
-                            {data.data.map((result, index) => (
-                                <li key={result.Url} className={`card ${showResults ? "animate-slide-up" : "opacity-0 translate-y-8"}`} style={{ animationDelay: `${index * 100}ms` }}>
-                                    <a href={result.Url} target="_blank" rel="noopener noreferrer" className="block group">
-                                        <p className="text-xl font-semibold group-hover:text-blue-600 transition-colors duration-200">{result.title}</p>
-                                        <p className="text-emerald-600 text-sm truncate mt-1">{result.Url}</p>
-                                    </a>
-                                    <div className="mt-2">
-                                        <HighlightText text={result.description} highlights={result.highlights} className="text-gray-600 text-sm leading-relaxed" />
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
+                        {data.data.length === 0 ? (
+                            <div className="text-center py-12">
+                                <p className="text-xl text-gray-600 mb-4">No results found</p>
+                                <p className="text-gray-500">Try different keywords</p>
+                            </div>
+                        ) : (
+                            <ul className="space-y-6">
+                                {data.data.map((result, index) => (
+                                    <li key={result.url} className={`card ${showResults ? "animate-slide-up" : "opacity-0 translate-y-8"}`} style={{ animationDelay: `${index * 100}ms` }}>
+                                        <a href={result.url} target="_blank" rel="noopener noreferrer" className="block group">
+                                            <p className="text-xl font-semibold group-hover:text-blue-600 transition-colors duration-200">{result.title}</p>
+                                            <p className="text-emerald-600 text-sm truncate mt-1">{result.url}</p>
+                                        </a>
+                                        <div className="mt-2">
+                                            <HighlightText text={result.description} className="text-gray-600 text-sm leading-relaxed" />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </>
                 )}
             </main>
