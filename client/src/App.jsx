@@ -17,6 +17,7 @@ const router = createBrowserRouter([
     path: "/search",
     element: <ResultsPage />,
     loader: ResultsPage.loader,
+    action: ResultsPage.action,
   },
 ]);
 
