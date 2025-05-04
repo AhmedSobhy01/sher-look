@@ -365,7 +365,10 @@ public class Ranker {
   }
 
   private void generateSnippets(
-      List<RankedDocument> documents, List<DocumentTerm> allDocTerms, List<String> queryTerms) {
+      List<RankedDocument> documents,
+      List<DocumentTerm> allDocTerms,
+      List<String> queryTerms,
+      boolean isPhraseSearch) {
     long totalStart = System.currentTimeMillis();
 
     // Measure time for filtering documents
@@ -401,6 +404,34 @@ public class Ranker {
         docPositions.computeIfAbsent(docId, k -> new ArrayList<>()).add(earliestPos);
       }
     }
+
+    if (isPhraseSearch && queryTerms.size() > 1) {
+      // Group terms by document
+      Map<Integer, Map<String, DocumentTerm>> docTermMap = new HashMap<>();
+      for (DocumentTerm term : relevantTerms) {
+        int docId = term.getDocumentId();
+        docTermMap.computeIfAbsent(docId, k -> new HashMap<>()).put(term.getWord(), term);
+      }
+
+      // Clear existing positions
+      docPositions.clear();
+
+      // Find phrase positions instead of individual term positions
+      for (int docId : docTermMap.keySet()) {
+        Map<String, DocumentTerm> termMap = docTermMap.get(docId);
+        if (termMap.keySet().containsAll(queryTerms)) {
+          // Find phrases in each section
+          for (String section : termMap.get(queryTerms.get(0)).getPositionsBySection().keySet()) {
+            List<Integer> phrasePositions =
+                findPhrasePositionsInSection(termMap, queryTerms, section);
+            if (!phrasePositions.isEmpty()) {
+              docPositions.computeIfAbsent(docId, k -> new ArrayList<>()).addAll(phrasePositions);
+            }
+          }
+        }
+      }
+    }
+
     long positionEnd = System.currentTimeMillis();
     System.out.println("Finding positions time: " + (positionEnd - positionStart) + " ms");
 
@@ -422,23 +453,59 @@ public class Ranker {
         continue;
       }
 
-      // Sort positions
       List<Integer> positions = new ArrayList<>(wordMap.keySet());
       Collections.sort(positions);
 
-      // Build snippet with highlighted terms
       StringBuilder snippet = new StringBuilder("... ");
-      Set<String> queryLower =
-          queryTerms.stream().map(String::toLowerCase).collect(Collectors.toSet());
 
-      for (Integer pos : positions) {
-        String word = wordMap.get(pos);
-        if (queryLower.contains(word.toLowerCase())) {
-          snippet.append("<b>").append(word).append("</b> ");
-        } else {
-          snippet.append(word).append(" ");
+      if (isPhraseSearch && queryTerms.size() > 1) {
+        for (Integer pos : positions) {
+          boolean isStartOfPhrase = true;
+          for (int i = 0; i < queryTerms.size(); i++) {
+            if (!wordMap.containsKey(pos + i)
+                || !wordMap.get(pos + i).toLowerCase().equals(queryTerms.get(i).toLowerCase())) {
+              isStartOfPhrase = false;
+              break;
+            }
+          }
+
+          if (isStartOfPhrase) {
+            for (int i = pos - 5; i < pos; i++) {
+              if (wordMap.containsKey(i)) {
+                snippet.append(wordMap.get(i)).append(" ");
+              }
+            }
+
+            snippet.append("<b>");
+            for (int i = 0; i < queryTerms.size(); i++) {
+              snippet.append(wordMap.get(pos + i));
+              if (i < queryTerms.size() - 1) snippet.append(" ");
+            }
+            snippet.append("</b> ");
+
+            for (int i = pos + queryTerms.size(); i < pos + queryTerms.size() + 5; i++) {
+              if (wordMap.containsKey(i)) {
+                snippet.append(wordMap.get(i)).append(" ");
+              }
+            }
+
+            break;
+          }
+        }
+      } else {
+        Set<String> queryLower =
+            queryTerms.stream().map(String::toLowerCase).collect(Collectors.toSet());
+
+        for (Integer pos : positions) {
+          String word = wordMap.get(pos);
+          if (queryLower.contains(word.toLowerCase())) {
+            snippet.append("<b>").append(word).append("</b> ");
+          } else {
+            snippet.append(word).append(" ");
+          }
         }
       }
+
       snippet.append("...");
 
       doc.setSnippet(snippet.toString());
@@ -448,6 +515,46 @@ public class Ranker {
 
     long totalEnd = System.currentTimeMillis();
     System.out.println("Total snippet generation time: " + (totalEnd - totalStart) + " ms");
+  }
+
+  // find exact phrase positions in a section
+  private List<Integer> findPhrasePositionsInSection(
+      Map<String, DocumentTerm> termMap, List<String> queryTerms, String section) {
+
+    List<Integer> phrasePositions = new ArrayList<>();
+    DocumentTerm firstTerm = termMap.get(queryTerms.get(0));
+
+    if (firstTerm == null || !firstTerm.getPositionsBySection().containsKey(section)) {
+      return phrasePositions;
+    }
+
+    List<Integer> firstPositions = firstTerm.getPositionsBySection().get(section);
+
+    for (int startPos : firstPositions) {
+      boolean phraseFound = true;
+
+      for (int i = 1; i < queryTerms.size(); i++) {
+        DocumentTerm nextTerm = termMap.get(queryTerms.get(i));
+        if (nextTerm == null || !nextTerm.getPositionsBySection().containsKey(section)) {
+          phraseFound = false;
+          break;
+        }
+
+        int expectedPos = startPos + i;
+        List<Integer> positions = nextTerm.getPositionsBySection().get(section);
+
+        if (!positions.contains(expectedPos)) {
+          phraseFound = false;
+          break;
+        }
+      }
+
+      if (phraseFound) {
+        phrasePositions.add(startPos);
+      }
+    }
+
+    return phrasePositions;
   }
 
   public List<RankedDocument> getPageWithSnippets(
@@ -460,7 +567,9 @@ public class Ranker {
         offset < allDocs.size() ? allDocs.subList(offset, endIndex) : new ArrayList<>();
 
     if (!pagedResults.isEmpty()) {
-      generateSnippets(pagedResults, documentTerms, queryTerms);
+      // NEW: Detect if this is a phrase search
+      boolean isPhraseSearch = queryTerms.size() > 1;
+      generateSnippets(pagedResults, documentTerms, queryTerms, isPhraseSearch);
     }
 
     return pagedResults;
