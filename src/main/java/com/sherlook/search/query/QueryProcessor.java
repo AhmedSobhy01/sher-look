@@ -73,13 +73,11 @@ public class QueryProcessor {
     }
 
     // Check if there is more than one phrase and fill the operators
-    if (i>1) {
+    if (i > 1) {
       i = 0;
       while (operatorMatch.find()) {
         String operator = operatorMatch.group().trim();
-        operators[i++] = operator.contains("AND") ? 1
-                : operator.contains("OR") ? 2
-                : 3;
+        operators[i++] = operator.contains("AND") ? 1 : operator.contains("OR") ? 2 : 3;
       }
     }
   }
