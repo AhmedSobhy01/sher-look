@@ -56,10 +56,10 @@ public class Robots {
             String agent = line.substring("user-agent:".length()).trim().toLowerCase();
             myUserAgent = agent.equals("*") || agent.equals("sher-look-cawler");
           } else if (line.toLowerCase().startsWith("disallow:") && myUserAgent) {
-            String disallowedUrl = line.substring("Disallow: ".length()).trim();
+            String disallowedUrl = line.substring("disallow:".length()).trim();
             disallowedUrls.add(Pattern.compile(ruleToRegex(disallowedUrl)));
           } else if (line.toLowerCase().startsWith("allow:") && myUserAgent) {
-            String allowedUrl = line.substring("Allow: ".length()).trim();
+            String allowedUrl = line.substring("allow:".length()).trim();
             allowedUrls.add(Pattern.compile(ruleToRegex(allowedUrl)));
           }
         }
