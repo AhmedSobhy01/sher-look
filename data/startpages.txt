@@ -197,3 +197,8 @@ https://www.ted.com 0
 https://www.archives.gov 0
 https://www.metmuseum.org 0
 https://www.getty.edu 0
+https://www.epicgames.com/fortnite 0
+https://www.minecraft.net 0
+https://www.ign.com 0
+https://www.hackerrank.com 0
+https://leetcode.com/problemset 0
