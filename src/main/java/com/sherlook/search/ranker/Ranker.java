@@ -2,7 +2,13 @@ package com.sherlook.search.ranker;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -20,7 +26,8 @@ public class Ranker {
   private static final double TF_IDF_CONTRIBUTION = 0.7;
   private static final double PAGE_RANK_CONTRIBUTION = 0.3;
 
-  // for optimization, helps me avoid two getDocumentTerms db calls, the most expensive one
+  // for optimization, helps me avoid two getDocumentTerms db calls, the most
+  // expensive one
   public static class RankingResult {
     private final List<RankedDocument> rankedDocuments;
     private final List<DocumentTerm> documentTerms;
@@ -36,6 +43,10 @@ public class Ranker {
 
     public List<DocumentTerm> getDocumentTerms() {
       return documentTerms;
+    }
+
+    public int getTotalDocuments() {
+      return rankedDocuments.size();
     }
   }
 
