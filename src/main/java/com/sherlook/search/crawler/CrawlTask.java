@@ -5,6 +5,7 @@ import com.sherlook.search.utils.DatabaseHelper;
 import com.sherlook.search.utils.Hash;
 import com.sherlook.search.utils.UrlNormalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -102,6 +103,7 @@ public class CrawlTask implements Runnable {
       System.out.println("Crawling URL: " + urlToCrawl);
       Connection conn = Jsoup.connect(urlToCrawl);
       conn = conn.timeout(2000);
+      conn = conn.userAgent("sher-look-crawler");
       Document doc = conn.get();
       if (conn.response().statusCode() == 200) {
         ConsoleColors.printSuccess(crawlTaskString);
@@ -143,10 +145,36 @@ public class CrawlTask implements Runnable {
       // Save the html page to file system
       htmlSaver.save(urlToCrawl, doc.html());
 
+      // Get the limit of children links
+      // and sort them by length
+      int limit = 0;
+      switch (urlToCrawlPair.getDepth()) {
+        case 0:
+          limit = 300;
+          break;
+        case 1:
+          limit = 150;
+          break;
+        case 2:
+          limit = 75;
+          break;
+        case 3:
+          limit = 50;
+          break;
+        default:
+          limit = 0;
+          break;
+      }
+
       // Save the crawled page to the database
       String title = doc.title();
       String description = doc.select("meta[name=description]").attr("content");
-      List<String> uniqueChildrens = links.stream().distinct().toList();
+      List<String> uniqueChildrens =
+          links.stream()
+              .distinct()
+              .sorted(Comparator.comparingInt(String::length))
+              .limit(limit)
+              .toList();
       saveDocumentWithLinks(urlToCrawl, title, description, hash, uniqueChildrens);
       ConsoleColors.printSuccess(crawlTaskString);
       System.out.println("Saved page to database: " + urlToCrawl);

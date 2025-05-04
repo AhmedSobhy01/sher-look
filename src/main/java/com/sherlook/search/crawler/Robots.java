@@ -45,12 +45,21 @@ public class Robots {
         BufferedReader reader =
             new BufferedReader(new InputStreamReader(connection.getInputStream()));
         String line;
+        boolean myUserAgent = false;
         while ((line = reader.readLine()) != null) {
-          if (line.startsWith("Disallow: ")) {
-            String disallowedUrl = line.substring("Disallow: ".length()).trim();
+          line = line.trim();
+
+          // Skip comments and empty lines
+          if (line.isEmpty() || line.startsWith("#")) continue;
+
+          if (line.toLowerCase().startsWith("user-agent:")) {
+            String agent = line.substring("user-agent:".length()).trim().toLowerCase();
+            myUserAgent = agent.equals("*") || agent.equals("sher-look-cawler");
+          } else if (line.toLowerCase().startsWith("disallow:") && myUserAgent) {
+            String disallowedUrl = line.substring("disallow:".length()).trim();
             disallowedUrls.add(Pattern.compile(ruleToRegex(disallowedUrl)));
-          } else if (line.startsWith("Allow: ")) {
-            String allowedUrl = line.substring("Allow: ".length()).trim();
+          } else if (line.toLowerCase().startsWith("allow:") && myUserAgent) {
+            String allowedUrl = line.substring("allow:".length()).trim();
             allowedUrls.add(Pattern.compile(ruleToRegex(allowedUrl)));
           }
         }

@@ -19,6 +19,7 @@ public class PersistentQueue {
   private final File queueFile;
   boolean intiallyEmpty;
   private long currentPosition = 0;
+  private final int maxSize = 50000;
 
   public PersistentQueue(File queueFile, Set<String> visitedUrlsSet) throws IOException {
     this.queueFile = queueFile;
@@ -93,7 +94,8 @@ public class PersistentQueue {
 
   public boolean offer(UrlDepthPair urlDepthPair) {
     try {
-      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair)) return false;
+      if (urlDepthPair == null || uncrawledSet.contains(urlDepthPair) || queue.size() >= maxSize)
+        return false;
 
       String urlString = urlDepthPair.getUrl();
       urlString = UrlNormalizer.normalize(urlString);
