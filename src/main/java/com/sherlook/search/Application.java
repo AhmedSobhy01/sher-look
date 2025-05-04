@@ -2,60 +2,53 @@ package com.sherlook.search;
 
 import com.sherlook.search.crawler.Crawler;
 import com.sherlook.search.indexer.Indexer;
-import com.sherlook.search.utils.DatabaseHelper;
+import com.sherlook.search.ranker.Ranker;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 
 @SpringBootApplication
 public class Application {
   public static void main(String[] args) {
     if (args.length > 0) {
-      ApplicationContext context = SpringApplication.run(Application.class);
+      ConfigurableApplicationContext context = SpringApplication.run(Application.class, args);
       switch (args[0].toLowerCase()) {
         case "crawl":
           Crawler crawler = context.getBean(Crawler.class);
           crawler.start();
+
+          context.close();
+          System.exit(0);
           break;
+
         case "index":
           Indexer indexer = context.getBean(Indexer.class);
           indexer.index();
+
+          context.close();
+          System.exit(0);
           break;
+
+        case "page-rank":
+          Ranker pageRank = context.getBean(Ranker.class);
+          pageRank.rankPagesByPopularity();
+
+          context.close();
+          System.exit(0);
+          break;
+
         case "serve":
-          DatabaseHelper databaseHelper = context.getBean(DatabaseHelper.class);
-          System.out.println("Populating IDF...");
-          databaseHelper.calculateIDF();
-          System.out.println("Populating FTS...");
-          databaseHelper.populateFtsTable();
           System.out.println("Ready to serve");
           break;
 
-          /*
-           * case "rank":
-           * Ranker ranker = context.getBean(Ranker.class);
-           * // compute time
-           *
-           * long startTime = System.currentTimeMillis();
-           * // stop words are bottlenecks
-           * List<String> queryTerms = Arrays.asList("machine", "learning");
-           * List<RankedDocument> ranked = ranker.rank(queryTerms, false, 3, 20);
-           * long endTime = System.currentTimeMillis();
-           * long duration = endTime - startTime;
-           * System.out.println("Time taken to compute Rank: " + duration + " ms");
-           * System.out.println("Ranked documents number :" + ranked.size());
-           * System.out.println(
-           * "Ranked document first with url: "
-           * + ranked.get(2).getUrl()
-           * + " with title "
-           * + ranked.get(2).getTitle());
-           * break;
-           */
-
         default:
-          System.out.println("Usage: java -jar search-engine.jar [crawl|index|serve]");
+          System.out.println("Usage: java -jar search-engine.jar [crawl|index|pageRank|serve]");
+          context.close();
+          System.exit(1);
       }
     } else {
-      System.out.println("Usage: java -jar search-engine.jar [crawl|index|serve]");
+      System.out.println("Usage: java -jar search-engine.jar [crawl|index|pageRank|serve]");
+      System.exit(1);
     }
   }
 }

@@ -292,7 +292,7 @@ public class DatabaseHelper {
     String idPlaceholders = String.join(",", Collections.nCopies(wordIdToWord.size(), "?"));
     String sql =
         "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, "
-            + "d.document_size,"
+            + "d.document_size, d.description, "
             + "GROUP_CONCAT(dw.position) AS positions "
             + "FROM document_words dw "
             + "JOIN documents d ON dw.document_id = d.id "
@@ -318,6 +318,7 @@ public class DatabaseHelper {
               while (rs.next()) {
                 int docId = rs.getInt("document_id");
                 int wordId = rs.getInt("word_id");
+                String description = rs.getString("description");
                 String word = wordIdToWord.get(wordId);
                 String section = rs.getString("section");
                 String positionsStr = rs.getString("positions");
@@ -341,7 +342,8 @@ public class DatabaseHelper {
                                 docId,
                                 rs.getString("url"),
                                 rs.getString("title"),
-                                rs.getInt("document_size"));
+                                rs.getInt("document_size"),
+                                description);
                           } catch (SQLException e) {
                             throw new RuntimeException(e);
                           }
@@ -510,19 +512,57 @@ public class DatabaseHelper {
     batchInsertDocumentWords(documentId, words, stems, positions, sections);
   }
 
-  // i would keep this to show him the FTS implementation if he wanted to :"
-  public void populateFtsTable() {
-    // Clear any existing FTS data
-    jdbcTemplate.execute("DELETE FROM document_fts");
+  public Map<Integer, Map<Integer, String>> getWordsAroundPositions(
+      Map<Integer, List<Integer>> docPositions, int windowSize) {
+    if (docPositions.isEmpty()) {
+      return Collections.emptyMap();
+    }
 
-    // Insert all document words into FTS
-    String sql =
-        "INSERT INTO document_fts(document_id, word, section, position) "
-            + "SELECT dw.document_id, w.word, dw.section, dw.position "
-            + "FROM document_words dw "
-            + "JOIN words w ON dw.word_id = w.id";
+    // Build dynamic query with parameters
+    StringBuilder sql =
+        new StringBuilder(
+            "SELECT dw.document_id, dw.position, w.word FROM document_words dw "
+                + "JOIN words w ON dw.word_id = w.id WHERE ");
 
-    jdbcTemplate.execute(sql);
-    System.out.println("FTS table populated successfully");
+    List<Object> params = new ArrayList<>();
+    boolean first = true;
+
+    for (Map.Entry<Integer, List<Integer>> entry : docPositions.entrySet()) {
+      int docId = entry.getKey();
+      for (Integer position : entry.getValue()) {
+        if (!first) {
+          sql.append(" OR ");
+        }
+        first = false;
+
+        sql.append("(dw.document_id = ? AND dw.position BETWEEN ? AND ?)");
+        params.add(docId);
+        params.add(Math.max(0, position - windowSize));
+        params.add(position + windowSize);
+      }
+    }
+
+    Map<Integer, Map<Integer, String>> result = new HashMap<>();
+
+    this.jdbcTemplate.query(
+        sql.toString(),
+        ps -> {
+          for (int i = 0; i < params.size(); i++) {
+            ps.setObject(i + 1, params.get(i));
+          }
+        },
+        (ResultSetExtractor<Void>)
+            rs -> {
+              while (rs.next()) {
+                int docId = rs.getInt("document_id");
+                int position = rs.getInt("position");
+                String word = rs.getString("word");
+
+                result.computeIfAbsent(docId, k -> new HashMap<>()).put(position, word);
+              }
+              return null;
+            });
+
+    return result;
   }
 }
