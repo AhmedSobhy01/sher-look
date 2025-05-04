@@ -36,7 +36,7 @@ public class QueryProcessor {
       return;
     }
 
-    query = query.trim().toLowerCase();
+    query = query.trim();
 
     if (query.equals(lastQuery)) {
       return;
@@ -73,11 +73,13 @@ public class QueryProcessor {
     }
 
     // Check if there is more than one phrase and fill the operators
-    if (i >= 2) {
-      int j = 0;
+    if (i>1) {
+      i = 0;
       while (operatorMatch.find()) {
-        String operator = operatorMatch.group().replaceAll("^\"|\"$", "").trim();
-        operators[j++] = operator.equals("AND") ? 1 : operator.equals("OR") ? 2 : 3;
+        String operator = operatorMatch.group().trim();
+        operators[i++] = operator.contains("AND") ? 1
+                : operator.contains("OR") ? 2
+                : 3;
       }
     }
   }
