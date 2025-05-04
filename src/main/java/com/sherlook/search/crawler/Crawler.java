@@ -104,6 +104,7 @@ public class Crawler {
       }
     }
 
+    long startTime = System.currentTimeMillis();
     for (int i = 0; i < threads; i++) {
       executor.execute(
           new CrawlTask(urlQueue, visitedUrls, maxPages, databaseHelper, htmlSaver, maxDepth, i));
@@ -113,8 +114,10 @@ public class Crawler {
     while (!executor.isTerminated()) {
       // Wait for all tasks to finish
     }
+    long endTime = System.currentTimeMillis();
+    long duration = endTime - startTime;
 
     ConsoleColors.printSuccess("Crawler");
-    System.out.println("All tasks completed");
+    System.out.println("All tasks completed in " + duration + " ms");
   }
 }
