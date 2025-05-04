@@ -32,6 +32,7 @@ export function transformSearchResults(apiResponse, query) {
         timeTaken: apiResponse.timeMs,
         totalDocuments: apiResponse.totalDocuments,
         totalPages: apiResponse.totalPages,
+        currentPage: apiResponse.page || 1,
         data: apiResponse.results.map((doc, index) => ({
             id: index + 1,
             url: doc.url || doc.documentUrl,
