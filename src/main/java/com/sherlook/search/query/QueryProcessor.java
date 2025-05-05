@@ -69,7 +69,7 @@ public class QueryProcessor {
     // Find all phrases in the query
     int i = 0;
     while (phraseMatch.find() && i < phrases.length) {
-      phrases[i++] = phraseMatch.group().replaceAll("\"", "").trim();
+      phrases[i++] = phraseMatch.group().replaceAll("\"", "").toLowerCase().trim();
     }
 
     // Check if there is more than one phrase and fill the operators

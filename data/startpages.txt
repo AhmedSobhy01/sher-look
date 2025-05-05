@@ -2,6 +2,7 @@ https://www.imdb.com 0
 https://stackoverflow.com 0
 https://github.com 0
 https://gitlab.com 0
+https://mangadna.com 0
 https://bitbucket.org 0
 https://www.freecodecamp.org 0
 https://www.codecademy.com 0
