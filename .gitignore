@@ -69,5 +69,6 @@ dist-ssr
 *.sln
 *.sw?
 data/*
-!data/startpages.txt
-!data/stop_words.txt
+!data/start-pages.txt
+!data/stop-words.txt
+crawled/*

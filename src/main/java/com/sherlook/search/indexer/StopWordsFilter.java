@@ -14,7 +14,7 @@ public class StopWordsFilter {
 
   public StopWordsFilter() {
     try {
-      Path path = Paths.get("data/stop_words.txt");
+      Path path = Paths.get("data/stop-words.txt");
 
       if (!Files.exists(path))
         throw new RuntimeException("Stop words file not found: " + path.toAbsolutePath());

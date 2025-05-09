@@ -1,11 +1,16 @@
 package com.sherlook.search.crawler;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.sherlook.search.utils.DatabaseHelper;
-import java.nio.file.*;
-import org.junit.jupiter.api.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class CrawlerTests {
@@ -29,7 +34,7 @@ class CrawlerTests {
     // Prepare temp files
     Path startPagesFile = tempDir.resolve("start-pages.txt");
     Path saveDir = tempDir.resolve("save-dir");
-    Path queueFile = tempDir.resolve("urlQueue.txt");
+    Path queueFile = tempDir.resolve("url-queue.txt");
 
     // Write fake start URLs
     Files.writeString(startPagesFile, "http://example.com 0\nhttp://example.org 0\n");
