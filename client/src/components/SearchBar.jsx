@@ -23,12 +23,15 @@ export default function SearchBar({ shadow = true, value = "" }) {
     const filterSuggestions = useCallback((searchQuery) => {
         const history = JSON.parse(localStorage.getItem("searchHistory") || "{}");
 
+        const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
         // Calculate scores for sorting suggestions
         const calculateScore = (term, query) => {
             if (!query) return { score: history[term].lastUsed / 1000000, term };
 
             const termLower = term.toLowerCase();
             const queryLower = query.toLowerCase();
+            const escapedQueryLower = escapeRegExp(queryLower);
 
             const recency = history[term].lastUsed / 1000000;
             const frequency = Math.log(history[term].count + 1) * 10; // to avoid biasing towards very frequent terms
@@ -45,7 +48,7 @@ export default function SearchBar({ shadow = true, value = "" }) {
                 if (position <= 3) matchScore += 10;
             }
 
-            const occurrences = (termLower.match(new RegExp(queryLower, "g")) || []).length;
+            const occurrences = (termLower.match(new RegExp(escapedQueryLower, "g")) || []).length;
             if (occurrences > 1) matchScore += occurrences * 5;
 
             return {
