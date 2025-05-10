@@ -40,7 +40,7 @@ The project is divided into several modules, each providing a critical function:
     -   Fast retrieval of documents when queried based on specific words.
     -   Support incremental updates with newly crawled content.
 -   **Performance:**
-    -  Processes approximately 6000 documents in less than 2 minutes.
+    -   Processes approximately 6000 documents in less than 2 minutes.
 
 ### Query Processor 🔍
 
@@ -54,7 +54,7 @@ The project is divided into several modules, each providing a critical function:
 
 ### Boolean Operators Support 🔀
 
-  - Supports Boolean operators (AND/OR/NOT) with a maximum of two operations per query, e.g., `"Football player" OR "Tennis player"`
+-   Supports Boolean operators (AND/OR/NOT) with a maximum of two operations per query, e.g., `"Football player" OR "Tennis player"`
 
 ### Ranker 📊
 
@@ -65,8 +65,8 @@ The project is divided into several modules, each providing a critical function:
 -   **Popularity:**  
     Measured using algorithms like PageRank, independent of the query.
 -   **Performance:**
-      -   First hit rendered in 20–50 ms
-      -   Subsequent hits in less than 5 ms
+    -   First hit rendered in 20–50 ms
+    -   Subsequent hits in less than 5 ms
 
 ### Web Interface 💻
 
@@ -145,6 +145,45 @@ Execute the following commands in order:
 5. **Open Your Browser:**
 
     Navigate to [http://localhost:5173](http://localhost:5173) (or the host printed in the terminal).
+
+## Running with Docker 🐳
+
+If you prefer to use Docker to manage services, follow these instructions:
+
+### Build and Run Services
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d
+
+# Build and start only the client
+docker-compose up --build client
+
+# Build and start only the backend
+docker-compose up --build app
+```
+
+### Running Different Modes
+
+```bash
+# Run the crawler in a container
+docker-compose run --rm app crawl
+
+# Run the indexer in a container
+docker-compose run --rm app index
+
+# Calculate page ranks in a container
+docker-compose run --rm app page-rank
+
+# Run the backend server
+docker-compose up app
+
+# Run the frontend client
+docker-compose up client
+```
 
 ## Notes ✍️
 
