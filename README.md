@@ -76,6 +76,13 @@ The project is divided into several modules, each providing a critical function:
     -   Shows query processing time.
     -   Implements pagination (e.g., 200 results over 20 pages).
     -   Offers interactive query suggestions based on popular completions.
+ 
+## Screenshots 📸
+
+-   **Homepage:**  
+    ![homePage](https://github.com/user-attachments/assets/a9262c51-b15d-44ba-b797-7b5035ecafa9)
+-   **Search Results:**  
+    ![resultsPage](https://github.com/user-attachments/assets/02888c72-cf7d-46b3-98fc-d4e0760de0a0)
 
 ## Build Instructions ⚙️
 
