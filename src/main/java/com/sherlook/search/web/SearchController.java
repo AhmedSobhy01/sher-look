@@ -28,7 +28,6 @@ public class SearchController {
           .maximumSize(3000) // LRU component
           .expireAfterWrite(
               30, TimeUnit.MINUTES) // TTL component (very frequent queries could become stale)
-          .recordStats()
           .build();
 
   @Autowired
@@ -53,13 +52,6 @@ public class SearchController {
 
     return getSearchResults(
         phrases, operators, isPhraseSearch, searchTerms, page, resultsPerPage, startTime);
-  }
-
-  @GetMapping("/admin/cache-stats")
-  @ResponseBody
-  public CacheStats getCacheStats() {
-    System.out.println("Cache stats: " + rankingCache.stats());
-    return rankingCache.stats();
   }
 
   private SearchResponse getSearchResults(
