@@ -80,7 +80,8 @@ public class SearchController {
 
     String cacheKey = getCacheKey(searchTerms, isPhraseSearch, operators);
     int offset = (page - 1) * resultsPerPage;
-
+    System.out.println("Search terms: " + searchTerms);
+    System.out.println("Cache key: " + cacheKey);
     List<RankedDocument> results;
     Ranker.RankingResult rankingResult;
 

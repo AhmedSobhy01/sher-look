@@ -37,6 +37,13 @@ CREATE TABLE IF NOT EXISTS links (
     PRIMARY KEY(source_document_id, target_url)
 );
 
-CREATE INDEX IF NOT EXISTS idx_document_words_covering ON document_words(word_id, document_id, section, position);
-CREATE INDEX IF NOT EXISTS idx_document_words ON document_words(document_id);
-CREATE INDEX IF NOT EXISTS idx_words ON words(word);
+CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+    title,
+    description,
+    content
+);
+
+
+CREATE INDEX IF NOT EXISTS idx_documents_wid_docid ON document_words(word_id, document_id);
+CREATE INDEX IF NOT EXISTS idx_document_words ON document_words(word_id);
+CREATE INDEX IF NOT EXISTS idx_documents_documents ON document_words(document_id);

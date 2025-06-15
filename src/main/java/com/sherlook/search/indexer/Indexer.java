@@ -97,6 +97,17 @@ public class Indexer {
         ConsoleColors.printInfo("Indexer");
         System.out.println(
             "  Indexed " + words.size() + " words for document ID=" + document.getId());
+
+        StringBuilder ftsContent = new StringBuilder();
+        ftsContent.append(title).append(" ").append(description).append(" ");
+        for (String word : words) {
+          ftsContent.append(word).append(" ");
+        }
+        databaseHelper.updateFTSEntry(document.getId(), ftsContent.toString().trim());
+
+        ConsoleColors.printInfo("Indexer");
+        System.out.println(
+            "  Updated FTS entry for document ID=" + document.getId() + " in the database");
       }
 
       // Update index time

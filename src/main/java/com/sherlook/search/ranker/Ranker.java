@@ -327,7 +327,8 @@ public class Ranker {
 
   public RankingResult rankAndStoreTotalDocuments(List<String> queryTerms, Boolean isPhraseSearch) {
     long start = System.currentTimeMillis();
-
+    System.out.println(
+        "Ranking documents for query INSIDE RANKER: " + String.join(" ", queryTerms));
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
 
     List<RankedDocument> tfIdfDocs;
@@ -367,6 +368,7 @@ public class Ranker {
     List<Set<Integer>> docIdSets = new ArrayList<>();
 
     // Process each phrase
+    long phraseStart = System.currentTimeMillis();
     for (int i = 0; i < phrases.length && phrases[i] != null; i++) {
       List<String> queryTerms = Arrays.asList(phrases[i].split("\\s+"));
       List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
@@ -374,6 +376,8 @@ public class Ranker {
       allDocumentTerms.addAll(documentTerms);
       docIdSets.add(phraseDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toSet()));
     }
+    long phraseEnd = System.currentTimeMillis();
+    System.out.println("Phrase processing time: " + (phraseEnd - phraseStart) + " ms");
 
     // Apply logical operators
     Set<Integer> resultDocIds = new HashSet<>();
