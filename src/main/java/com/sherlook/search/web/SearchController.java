@@ -62,13 +62,6 @@ public class SearchController {
     return rankingCache.stats();
   }
 
-  @GetMapping("/admin/test")
-  @ResponseBody
-  public String testEndpoint() {
-    System.out.println("Test endpoint hit");
-    return "Server is reachable";
-  }
-
   private SearchResponse getSearchResults(
       String[] phrases,
       int[] operators,
