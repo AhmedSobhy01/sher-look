@@ -2,7 +2,6 @@ package com.sherlook.search.web;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.ranker.RankedDocument;
 import com.sherlook.search.ranker.Ranker;
