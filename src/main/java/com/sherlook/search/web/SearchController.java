@@ -5,7 +5,10 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.ranker.RankedDocument;
 import com.sherlook.search.ranker.Ranker;
-import java.util.*;
+import com.sherlook.search.utils.ConsoleColors;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -43,14 +46,47 @@ public class SearchController {
       @RequestParam(defaultValue = "10") int resultsPerPage) {
 
     long startTime = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Received search request:");
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("  Query: " + ConsoleColors.BOLD_CYAN + query + ConsoleColors.RESET);
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("  Page: " + page + ", Results per page: " + resultsPerPage);
+
     queryProcessor.processQuery(query);
     String[] phrases = queryProcessor.getPhrases();
     int[] operators = queryProcessor.getOperators();
     boolean isPhraseSearch = queryProcessor.isPhraseMatching();
     List<String> searchTerms = getSearchTerms();
 
-    return getSearchResults(
-        phrases, operators, isPhraseSearch, searchTerms, page, resultsPerPage, startTime);
+    ConsoleColors.printInfo("SearchController");
+    System.out.println(
+        "Search type: "
+            + (isPhraseSearch
+                ? ConsoleColors.BOLD_YELLOW + "Phrase search"
+                : ConsoleColors.BOLD_GREEN + "Keyword search")
+            + ConsoleColors.RESET);
+
+    SearchResponse response =
+        getSearchResults(
+            phrases, operators, isPhraseSearch, searchTerms, page, resultsPerPage, startTime);
+
+    long totalTime = System.currentTimeMillis() - startTime;
+    ConsoleColors.printSuccess("SearchController");
+    System.out.println(
+        "Search completed in "
+            + ConsoleColors.BOLD_GREEN
+            + totalTime
+            + "ms"
+            + ConsoleColors.RESET
+            + " - Found "
+            + ConsoleColors.BOLD_CYAN
+            + response.getTotalDocuments()
+            + ConsoleColors.RESET
+            + " results");
+
+    return response;
   }
 
   private SearchResponse getSearchResults(
@@ -64,15 +100,37 @@ public class SearchController {
 
     String cacheKey = getCacheKey(searchTerms, isPhraseSearch, operators);
     int offset = (page - 1) * resultsPerPage;
-    System.out.println("Search terms: " + searchTerms);
-    System.out.println("Cache key: " + cacheKey);
+
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Cache key: " + ConsoleColors.BOLD_PURPLE + cacheKey + ConsoleColors.RESET);
+    ConsoleColors.printInfo("SearchController");
+    System.out.print("Search terms: ");
+    for (String term : searchTerms) {
+      System.out.print(ConsoleColors.BOLD_CYAN + term + ConsoleColors.RESET + " ");
+    }
+    System.out.println();
+
     List<RankedDocument> results;
     Ranker.RankingResult rankingResult;
 
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Checking ranking cache...");
+
+    boolean cacheHit = rankingCache.getIfPresent(cacheKey) != null;
     rankingResult =
         rankingCache.get(
             cacheKey,
             key -> {
+              ConsoleColors.printInfo("SearchController");
+              System.out.println(
+                  cacheHit
+                      ? "Cache " + ConsoleColors.BOLD_GREEN + "HIT" + ConsoleColors.RESET
+                      : "Cache "
+                          + ConsoleColors.BOLD_YELLOW
+                          + "MISS"
+                          + ConsoleColors.RESET
+                          + " - Performing ranking");
+
               if (isPhraseSearch) {
                 return ranker.rankAndStoreTotalDocumentsPhrases(phrases, operators);
               } else {
@@ -80,9 +138,23 @@ public class SearchController {
               }
             });
 
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Getting page " + page + " with offset " + offset);
     results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
-    return createResponse(
-        results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
+
+    long queryTime = System.currentTimeMillis() - startTime;
+
+    ConsoleColors.printInfo("SearchController");
+    System.out.println(
+        "Returning "
+            + results.size()
+            + " results (page "
+            + page
+            + " of "
+            + Math.ceil((double) rankingResult.getTotalDocuments() / resultsPerPage)
+            + ")");
+
+    return createResponse(results, rankingResult, resultsPerPage, queryTime);
   }
 
   private SearchResponse createResponse(
