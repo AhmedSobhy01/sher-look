@@ -1,6 +1,7 @@
 package com.sherlook.search.query;
 
 import com.sherlook.search.indexer.Tokenizer;
+import com.sherlook.search.utils.ConsoleColors;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -31,23 +32,75 @@ public class QueryProcessor {
 
   // Processes a user search query.
   public void processQuery(String query) {
-    System.out.println("Processing query: " + query);
     if (query == null || query.trim().isEmpty()) {
+      ConsoleColors.printWarning("QueryProcessor");
+      System.out.println("Empty query received");
       return;
     }
 
     query = query.trim();
 
+    ConsoleColors.printInfo("QueryProcessor");
+    System.out.println(
+        "Processing query: " + ConsoleColors.BOLD_CYAN + query + ConsoleColors.RESET);
+
     if (query.equals(lastQuery)) {
+      ConsoleColors.printInfo("QueryProcessor");
+      System.out.println("Using cached results for query: " + query);
       return;
     } else {
       lastQuery = query;
     }
 
     if (query.matches("\".*\"")) {
+      ConsoleColors.printInfo("QueryProcessor");
+      System.out.println(
+          "Detected "
+              + ConsoleColors.BOLD_YELLOW
+              + "phrase search"
+              + ConsoleColors.RESET
+              + " query");
       parsePhrases(query);
     } else {
+      ConsoleColors.printInfo("QueryProcessor");
+      System.out.println(
+          "Detected "
+              + ConsoleColors.BOLD_GREEN
+              + "keyword search"
+              + ConsoleColors.RESET
+              + " query");
       parseTokens(query);
+    }
+
+    if (isPhraseMatching) {
+      ConsoleColors.printInfo("QueryProcessor");
+      System.out.print("Phrases: ");
+      for (int i = 0; i < phrases.length && phrases[i] != null; i++) {
+        System.out.print(ConsoleColors.BOLD_CYAN + phrases[i] + ConsoleColors.RESET);
+        if (i < phrases.length - 1 && phrases[i + 1] != null) {
+          String op = "?";
+          switch (operators[i]) {
+            case 1:
+              op = "AND";
+              break;
+            case 2:
+              op = "OR";
+              break;
+            case 3:
+              op = "NOT";
+              break;
+          }
+          System.out.print(" " + ConsoleColors.BOLD_PURPLE + op + ConsoleColors.RESET + " ");
+        }
+      }
+      System.out.println();
+    } else {
+      ConsoleColors.printInfo("QueryProcessor");
+      System.out.println(
+          "Tokens: " + ConsoleColors.BOLD_CYAN + String.join(", ", tokens) + ConsoleColors.RESET);
+      ConsoleColors.printInfo("QueryProcessor");
+      System.out.println(
+          "Stems: " + ConsoleColors.BOLD_GREEN + String.join(", ", stems) + ConsoleColors.RESET);
     }
   }
 

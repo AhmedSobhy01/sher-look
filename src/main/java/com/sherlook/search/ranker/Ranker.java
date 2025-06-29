@@ -2,7 +2,14 @@ package com.sherlook.search.ranker;
 
 import com.sherlook.search.utils.ConsoleColors;
 import com.sherlook.search.utils.DatabaseHelper;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -160,10 +167,10 @@ public class Ranker {
 
       // check convergence
       if (maxDiff < CONVERGENCE_THRESHOLD) {
-        ConsoleColors.printSuccess("PageRank");
+        ConsoleColors.printSuccess("Ranker");
         System.out.println("Converged after " + (i + 1) + " iterations with max diff: " + maxDiff);
 
-        ConsoleColors.printSuccess("PageRank");
+        ConsoleColors.printSuccess("Ranker");
         System.out.println("Convergence threshold: " + CONVERGENCE_THRESHOLD);
         converged = true;
         break;
@@ -173,13 +180,14 @@ public class Ranker {
     }
 
     if (!converged) {
+      ConsoleColors.printWarning("Ranker");
       System.out.println("PageRank did not converge after " + MAX_ITERATIONS + " iterations");
     }
     return pageRankPrevious;
   }
 
   public void rankPagesByPopularity() {
-    ConsoleColors.printSuccess("PageRank");
+    ConsoleColors.printSuccess("Ranker");
     System.out.println("Started ranking pages by popularity");
 
     long start = System.currentTimeMillis();
@@ -188,16 +196,16 @@ public class Ranker {
     List<Link> links = databaseHelper.getLinks();
     Map<Integer, Double> pageRankScores = computePageRank(docIds, links);
 
-    ConsoleColors.printSuccess("PageRank");
+    ConsoleColors.printSuccess("Ranker");
     System.out.println("PageRank scores computed");
 
-    ConsoleColors.printSuccess("PageRank");
+    ConsoleColors.printSuccess("Ranker");
     System.out.println("Updating PageRank scores in the database");
     databaseHelper.batchUpdatePageRank(pageRankScores);
-    ConsoleColors.printSuccess("PageRank");
+    ConsoleColors.printSuccess("Ranker");
     System.out.println("PageRank scores updated in the database");
 
-    ConsoleColors.printSuccess("PageRank");
+    ConsoleColors.printSuccess("Ranker");
     System.out.println(
         "Ranking pages completed in " + (System.currentTimeMillis() - start) + " ms");
   }
@@ -327,8 +335,27 @@ public class Ranker {
 
   public RankingResult rankAndStoreTotalDocuments(List<String> queryTerms, Boolean isPhraseSearch) {
     long start = System.currentTimeMillis();
+    ConsoleColors.printInfo("Ranker");
+    System.out.println(
+        "Starting ranking for "
+            + (isPhraseSearch
+                ? ConsoleColors.BOLD_YELLOW + "phrase search"
+                : ConsoleColors.BOLD_GREEN + "keyword search")
+            + ConsoleColors.RESET
+            + ": "
+            + ConsoleColors.BOLD_CYAN
+            + String.join(" ", queryTerms)
+            + ConsoleColors.RESET);
 
     List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
+
+    ConsoleColors.printInfo("Ranker");
+    System.out.println(
+        "Found "
+            + ConsoleColors.BOLD_CYAN
+            + documentTerms.size()
+            + ConsoleColors.RESET
+            + " document terms matching the query");
 
     List<RankedDocument> tfIdfDocs;
     if (isPhraseSearch) {
@@ -336,6 +363,14 @@ public class Ranker {
     } else {
       tfIdfDocs = getDocumentTfIdf(queryTerms, documentTerms);
     }
+
+    ConsoleColors.printInfo("Ranker");
+    System.out.println(
+        "Calculated TF-IDF scores for "
+            + ConsoleColors.BOLD_CYAN
+            + tfIdfDocs.size()
+            + ConsoleColors.RESET
+            + " documents");
 
     // Apply PageRank
     List<Integer> docIds =
@@ -353,13 +388,27 @@ public class Ranker {
     tfIdfDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));
 
     long end = System.currentTimeMillis();
-    System.out.println("Ranking time: " + (end - start) + " ms");
+    ConsoleColors.printSuccess("Ranker");
+    System.out.println(
+        "Ranking completed in "
+            + ConsoleColors.BOLD_GREEN
+            + (end - start)
+            + "ms"
+            + ConsoleColors.RESET
+            + " - Found "
+            + ConsoleColors.BOLD_CYAN
+            + tfIdfDocs.size()
+            + ConsoleColors.RESET
+            + " documents");
 
     return new RankingResult(tfIdfDocs, documentTerms);
   }
 
   public RankingResult rankAndStoreTotalDocumentsPhrases(String[] phrases, int[] operators) {
     long start = System.currentTimeMillis();
+    ConsoleColors.printInfo("Ranker");
+    System.out.println("Starting phrase ranking with logical operators");
+
     List<RankedDocument> finalDocs = new ArrayList<>();
 
     // Handle phrase search with operators
@@ -367,13 +416,40 @@ public class Ranker {
     List<Set<Integer>> docIdSets = new ArrayList<>();
 
     // Process each phrase
+    long phraseStart = System.currentTimeMillis();
     for (int i = 0; i < phrases.length && phrases[i] != null; i++) {
       List<String> queryTerms = Arrays.asList(phrases[i].split("\\s+"));
+      ConsoleColors.printInfo("Ranker");
+      System.out.println(
+          "Processing phrase "
+              + (i + 1)
+              + ": "
+              + ConsoleColors.BOLD_CYAN
+              + phrases[i]
+              + ConsoleColors.RESET);
+
       List<DocumentTerm> documentTerms = databaseHelper.getDocumentTerms(queryTerms);
       List<RankedDocument> phraseDocs = getDocumentTfIdfPhrases(queryTerms, documentTerms);
       allDocumentTerms.addAll(documentTerms);
       docIdSets.add(phraseDocs.stream().map(RankedDocument::getDocId).collect(Collectors.toSet()));
+
+      ConsoleColors.printInfo("Ranker");
+      System.out.println(
+          "Found "
+              + ConsoleColors.BOLD_CYAN
+              + phraseDocs.size()
+              + ConsoleColors.RESET
+              + " documents for phrase: "
+              + phrases[i]);
     }
+    long phraseEnd = System.currentTimeMillis();
+    ConsoleColors.printInfo("Ranker");
+    System.out.println(
+        "Phrase processing completed in "
+            + ConsoleColors.BOLD_CYAN
+            + (phraseEnd - phraseStart)
+            + "ms"
+            + ConsoleColors.RESET);
 
     // Apply logical operators
     Set<Integer> resultDocIds = new HashSet<>();
@@ -432,7 +508,18 @@ public class Ranker {
     finalDocs.sort((d1, d2) -> Double.compare(d2.getFinalScore(), d1.getFinalScore()));
 
     long end = System.currentTimeMillis();
-    System.out.println("Ranking time: " + (end - start) + " ms");
+    ConsoleColors.printSuccess("Ranker");
+    System.out.println(
+        "Ranking completed in "
+            + ConsoleColors.BOLD_GREEN
+            + (end - start)
+            + "ms"
+            + ConsoleColors.RESET
+            + " - Found "
+            + ConsoleColors.BOLD_CYAN
+            + finalDocs.size()
+            + ConsoleColors.RESET
+            + " documents");
 
     return new RankingResult(finalDocs, allDocumentTerms);
   }
@@ -450,6 +537,8 @@ public class Ranker {
             .filter(term -> docIds.contains(term.getDocumentId()))
             .collect(Collectors.toList());
     long filterEnd = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("Ranker");
     System.out.println("Filtering relevant terms time: " + (filterEnd - filterStart) + " ms");
 
     // Measure time for position calculation
@@ -475,6 +564,8 @@ public class Ranker {
       }
     }
     long positionEnd = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("Ranker");
     System.out.println("Finding positions time: " + (positionEnd - positionStart) + " ms");
 
     // Measure database call time
@@ -482,6 +573,8 @@ public class Ranker {
     Map<Integer, Map<Integer, String>> surroundingWords =
         databaseHelper.getWordsAroundPositions(docPositions, 10);
     long dbEnd = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("Ranker");
     System.out.println("Database call for surrounding words: " + (dbEnd - dbStart) + " ms");
 
     // Measure snippet creation time
@@ -517,9 +610,13 @@ public class Ranker {
       doc.setSnippet(snippet.toString());
     }
     long snippetEnd = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("Ranker");
     System.out.println("Snippet creation time: " + (snippetEnd - snippetStart) + " ms");
 
     long totalEnd = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("Ranker");
     System.out.println("Total snippet generation time: " + (totalEnd - totalStart) + " ms");
   }
 

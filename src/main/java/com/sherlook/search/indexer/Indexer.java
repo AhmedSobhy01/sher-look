@@ -22,6 +22,8 @@ public class Indexer {
   private final PlatformTransactionManager txManager;
   private final Tokenizer tokenizer;
 
+  private static final int BATCH_SIZE = 10000;
+
   @Autowired
   public Indexer(
       DatabaseHelper databaseHelper, PlatformTransactionManager txManager, Tokenizer tokenizer) {
@@ -71,6 +73,7 @@ public class Indexer {
       List<Integer> positions = new ArrayList<>();
       List<Section> sections = new ArrayList<>();
       int pos = 0;
+      int totalWordCount = 0;
 
       if (!title.isEmpty())
         pos =
@@ -84,27 +87,48 @@ public class Indexer {
         Section sec = el.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
         pos =
             tokenizer.tokenizeWithPositions(el.text(), pos, words, stems, positions, sections, sec);
+
+        // Process in batches to avoid going out of memory
+        if (words.size() >= BATCH_SIZE) {
+          processBatch(document.getId(), words, stems, positions, sections);
+          totalWordCount += words.size();
+
+          words.clear();
+          stems.clear();
+          positions.clear();
+          sections.clear();
+        }
       }
 
       // Insert words into the database
       if (!words.isEmpty()) {
-        databaseHelper.batchInsertDocumentWords(
-            document.getId(), words, stems, positions, sections);
+        processBatch(document.getId(), words, stems, positions, sections);
+        totalWordCount += words.size();
+      }
 
-        // Update document's total word count
-        databaseHelper.updateDocumentSize(document.getId(), words.size());
+      // Update document's total word count
+      if (totalWordCount > 0) {
+        databaseHelper.updateDocumentSize(document.getId(), totalWordCount);
 
         ConsoleColors.printInfo("Indexer");
         System.out.println(
-            "  Indexed " + words.size() + " words for document ID=" + document.getId());
+            "  Indexed " + totalWordCount + " words for document ID=" + document.getId());
+        long elapsed = System.currentTimeMillis() - startTime;
+        ConsoleColors.printSuccess("Indexer");
+        System.out.println("Indexing completed in " + elapsed + " ms");
+
+        StringBuilder ftsContent = new StringBuilder();
+        ftsContent.append(title).append(" ").append(description);
+
+        databaseHelper.updateFTSEntry(document.getId(), ftsContent.toString().trim());
+
+        ConsoleColors.printInfo("Indexer");
+        System.out.println(
+            "  Updated FTS entry for document ID=" + document.getId() + " in the database");
       }
 
       // Update index time
       databaseHelper.updateIndexTime(document.getId());
-
-      long elapsed = System.currentTimeMillis() - startTime;
-      ConsoleColors.printSuccess("Indexer");
-      System.out.println("Indexing completed in " + elapsed + " ms");
 
       txManager.commit(status);
     } catch (Exception e) {
@@ -115,6 +139,25 @@ public class Indexer {
               + document.getId()
               + ", rolled back. Cause: "
               + e.getMessage());
+    }
+  }
+
+  private void processBatch(
+      int documentId,
+      List<String> words,
+      List<String> stems,
+      List<Integer> positions,
+      List<Section> sections) {
+    try {
+      if (!words.isEmpty()) {
+        databaseHelper.batchInsertDocumentWords(documentId, words, stems, positions, sections);
+        ConsoleColors.printInfo("Indexer");
+        System.out.println("  Processed batch of " + words.size() + " words");
+      }
+    } catch (Exception e) {
+      ConsoleColors.printError("Indexer");
+      System.err.println("Error processing batch: " + e.getMessage());
+      throw e;
     }
   }
 

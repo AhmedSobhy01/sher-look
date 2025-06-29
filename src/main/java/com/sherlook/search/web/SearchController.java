@@ -1,12 +1,16 @@
 package com.sherlook.search.web;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.sherlook.search.query.QueryProcessor;
 import com.sherlook.search.ranker.RankedDocument;
 import com.sherlook.search.ranker.Ranker;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.sherlook.search.utils.ConsoleColors;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +25,12 @@ public class SearchController {
   private final QueryProcessor queryProcessor;
   private final Ranker ranker;
 
-  private final Map<String, Ranker.RankingResult> rankingCache = new HashMap<>();
-  private final Map<String, Long> cacheTimestamps = new HashMap<>();
-  private static final long CACHE_EXPIRY_MS = 120000; // 2 minutes
+  private final Cache<String, Ranker.RankingResult> rankingCache =
+      Caffeine.newBuilder()
+          .maximumSize(3000) // LRU component
+          .expireAfterWrite(
+              30, TimeUnit.MINUTES) // TTL component (very frequent queries could become stale)
+          .build();
 
   @Autowired
   public SearchController(QueryProcessor queryProcessor, Ranker ranker) {
@@ -39,14 +46,47 @@ public class SearchController {
       @RequestParam(defaultValue = "10") int resultsPerPage) {
 
     long startTime = System.currentTimeMillis();
+
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Received search request:");
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("  Query: " + ConsoleColors.BOLD_CYAN + query + ConsoleColors.RESET);
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("  Page: " + page + ", Results per page: " + resultsPerPage);
+
     queryProcessor.processQuery(query);
     String[] phrases = queryProcessor.getPhrases();
     int[] operators = queryProcessor.getOperators();
     boolean isPhraseSearch = queryProcessor.isPhraseMatching();
     List<String> searchTerms = getSearchTerms();
 
-    return getSearchResults(
-        phrases, operators, isPhraseSearch, searchTerms, page, resultsPerPage, startTime);
+    ConsoleColors.printInfo("SearchController");
+    System.out.println(
+        "Search type: "
+            + (isPhraseSearch
+                ? ConsoleColors.BOLD_YELLOW + "Phrase search"
+                : ConsoleColors.BOLD_GREEN + "Keyword search")
+            + ConsoleColors.RESET);
+
+    SearchResponse response =
+        getSearchResults(
+            phrases, operators, isPhraseSearch, searchTerms, page, resultsPerPage, startTime);
+
+    long totalTime = System.currentTimeMillis() - startTime;
+    ConsoleColors.printSuccess("SearchController");
+    System.out.println(
+        "Search completed in "
+            + ConsoleColors.BOLD_GREEN
+            + totalTime
+            + "ms"
+            + ConsoleColors.RESET
+            + " - Found "
+            + ConsoleColors.BOLD_CYAN
+            + response.getTotalDocuments()
+            + ConsoleColors.RESET
+            + " results");
+
+    return response;
   }
 
   private SearchResponse getSearchResults(
@@ -61,31 +101,60 @@ public class SearchController {
     String cacheKey = getCacheKey(searchTerms, isPhraseSearch, operators);
     int offset = (page - 1) * resultsPerPage;
 
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Cache key: " + ConsoleColors.BOLD_PURPLE + cacheKey + ConsoleColors.RESET);
+    ConsoleColors.printInfo("SearchController");
+    System.out.print("Search terms: ");
+    for (String term : searchTerms) {
+      System.out.print(ConsoleColors.BOLD_CYAN + term + ConsoleColors.RESET + " ");
+    }
+    System.out.println();
+
     List<RankedDocument> results;
     Ranker.RankingResult rankingResult;
 
-    if (rankingCache.containsKey(cacheKey)) {
-      long timestamp = cacheTimestamps.getOrDefault(cacheKey, 0L);
-      if (System.currentTimeMillis() - timestamp < CACHE_EXPIRY_MS) {
-        rankingResult = rankingCache.get(cacheKey);
-        results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
-        return createResponse(
-            results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
-      }
-    }
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Checking ranking cache...");
 
-    // Cache miss or expired
-    if (isPhraseSearch) {
-      rankingResult = ranker.rankAndStoreTotalDocumentsPhrases(phrases, operators);
-    } else {
-      rankingResult = ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
-    }
-    rankingCache.put(cacheKey, rankingResult);
-    cacheTimestamps.put(cacheKey, System.currentTimeMillis());
+    boolean cacheHit = rankingCache.getIfPresent(cacheKey) != null;
+    rankingResult =
+        rankingCache.get(
+            cacheKey,
+            key -> {
+              ConsoleColors.printInfo("SearchController");
+              System.out.println(
+                  cacheHit
+                      ? "Cache " + ConsoleColors.BOLD_GREEN + "HIT" + ConsoleColors.RESET
+                      : "Cache "
+                          + ConsoleColors.BOLD_YELLOW
+                          + "MISS"
+                          + ConsoleColors.RESET
+                          + " - Performing ranking");
 
+              if (isPhraseSearch) {
+                return ranker.rankAndStoreTotalDocumentsPhrases(phrases, operators);
+              } else {
+                return ranker.rankAndStoreTotalDocuments(searchTerms, isPhraseSearch);
+              }
+            });
+
+    ConsoleColors.printInfo("SearchController");
+    System.out.println("Getting page " + page + " with offset " + offset);
     results = ranker.getPageWithSnippets(rankingResult, searchTerms, offset, resultsPerPage);
-    return createResponse(
-        results, rankingResult, resultsPerPage, System.currentTimeMillis() - startTime);
+
+    long queryTime = System.currentTimeMillis() - startTime;
+
+    ConsoleColors.printInfo("SearchController");
+    System.out.println(
+        "Returning "
+            + results.size()
+            + " results (page "
+            + page
+            + " of "
+            + Math.ceil((double) rankingResult.getTotalDocuments() / resultsPerPage)
+            + ")");
+
+    return createResponse(results, rankingResult, resultsPerPage, queryTime);
   }
 
   private SearchResponse createResponse(
@@ -134,21 +203,6 @@ public class SearchController {
       return terms;
     } else {
       return queryProcessor.getTokens();
-    }
-  }
-
-  @Scheduled(fixedRate = 60000) // Run every minute
-  public void cleanupExpiredCache() {
-    long currentTime = System.currentTimeMillis();
-    List<String> keysToRemove =
-        cacheTimestamps.entrySet().stream()
-            .filter(entry -> currentTime - entry.getValue() >= CACHE_EXPIRY_MS)
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
-
-    for (String key : keysToRemove) {
-      rankingCache.remove(key);
-      cacheTimestamps.remove(key);
     }
   }
 

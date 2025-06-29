@@ -7,6 +7,7 @@ import com.sherlook.search.indexer.Word;
 import com.sherlook.search.ranker.DocumentTerm;
 import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
 import com.sherlook.search.ranker.Link;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,8 +20,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -261,100 +262,175 @@ public class DatabaseHelper {
   }
 
   public List<DocumentTerm> getDocumentTerms(List<String> queryTerms) {
-    if (queryTerms.isEmpty()) {
+    if (queryTerms == null || queryTerms.isEmpty()) {
+      return Collections.emptyList();
+    }
+    long totalStartTime = System.currentTimeMillis();
+    System.out.println("\n--- Starting getDocumentTerms (Final Optimized Plan) ---");
+    System.out.println("Query Terms: " + queryTerms);
+
+    // FTS pre-filter for candidates
+    long stepStartTime = System.currentTimeMillis();
+    String ftsQuery = String.join(" OR ", queryTerms);
+    String ftsCandidateSql = "SELECT rowid FROM documents_fts WHERE documents_fts MATCH ?";
+    List<Integer> candidateDocIds =
+        jdbcTemplate.queryForList(ftsCandidateSql, new Object[] {ftsQuery}, Integer.class);
+    long stepEndTime = System.currentTimeMillis();
+    System.out.println(
+        String.format(
+            "1. FTS Query ('%s'): %d ms [Found %d docs]",
+            ftsQuery, (stepEndTime - stepStartTime), candidateDocIds.size()));
+
+    if (candidateDocIds.isEmpty()) {
       return Collections.emptyList();
     }
 
-    // Step 1: Get word IDs first (smaller, faster query)
-    String wordPlaceholders = String.join(",", Collections.nCopies(queryTerms.size(), "?"));
-    String wordIdSql = "SELECT id, word FROM words WHERE word IN (" + wordPlaceholders + ")";
+    // get word ids
+    stepStartTime = System.currentTimeMillis();
     Map<Integer, String> wordIdToWord = new HashMap<>();
-
-    jdbcTemplate.query(
-        wordIdSql,
-        ps -> {
-          for (int i = 0; i < queryTerms.size(); i++) {
-            ps.setString(i + 1, queryTerms.get(i));
-          }
-        },
-        rs -> {
-          while (rs.next()) {
+    String wordPlaceholders =
+        "(" + String.join(",", Collections.nCopies(queryTerms.size(), "?")) + ")";
+    String wordIdSql = "SELECT id, word FROM words WHERE word IN " + wordPlaceholders;
+    Object[] queryParams = queryTerms.toArray();
+    try {
+      jdbcTemplate.query(
+          wordIdSql,
+          queryParams,
+          rs -> {
             wordIdToWord.put(rs.getInt("id"), rs.getString("word"));
-          }
-          return null;
-        });
+          });
+    } catch (Exception e) {
+      System.err.println("Error executing wordIdSql query: " + e.getMessage());
+      e.printStackTrace();
+    }
+    stepEndTime = System.currentTimeMillis();
+    System.out.println(
+        String.format(
+            "2. Word ID Lookup: %d ms [Found %d words]",
+            (stepEndTime - stepStartTime), wordIdToWord.size()));
 
     if (wordIdToWord.isEmpty()) {
       return Collections.emptyList();
     }
 
-    // Step 2: Use word IDs to fetch document terms directly
-    String idPlaceholders = String.join(",", Collections.nCopies(wordIdToWord.size(), "?"));
-    String sql =
-        "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, "
-            + "d.document_size, d.description, "
-            + "GROUP_CONCAT(dw.position) AS positions "
-            + "FROM document_words dw "
-            + "JOIN documents d ON dw.document_id = d.id "
-            + "WHERE dw.word_id IN ("
-            + idPlaceholders
-            + ") "
-            + "GROUP BY d.id, dw.word_id, dw.section";
+    // temp table to eliminate the large IN (...docIds...)
+    stepStartTime = System.currentTimeMillis();
+    jdbcTemplate.execute("CREATE TEMP TABLE temp_candidate_ids (id INTEGER PRIMARY KEY)");
+    stepEndTime = System.currentTimeMillis();
+    System.out.println(
+        String.format("3a. Temp Table Creation: %d ms", (stepEndTime - stepStartTime)));
 
-    // Process results in Java instead of using GROUP_CONCAT
-    Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
+    List<DocumentTerm> result;
+    try {
+      stepStartTime = System.currentTimeMillis();
+      jdbcTemplate.batchUpdate(
+          "INSERT INTO temp_candidate_ids (id) VALUES (?)",
+          new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+              ps.setInt(1, candidateDocIds.get(i));
+            }
 
-    jdbcTemplate.query(
-        sql,
-        (PreparedStatementSetter)
-            ps -> {
-              int i = 1;
-              for (Integer wordId : wordIdToWord.keySet()) {
-                ps.setInt(i++, wordId);
-              }
-            },
-        (ResultSetExtractor<Void>)
-            rs -> {
-              while (rs.next()) {
-                int docId = rs.getInt("document_id");
-                int wordId = rs.getInt("word_id");
-                String description = rs.getString("description");
-                String word = wordIdToWord.get(wordId);
-                String section = rs.getString("section");
-                String positionsStr = rs.getString("positions");
-                List<Integer> positions = new ArrayList<>();
-                if (positionsStr != null && !positionsStr.isEmpty()) {
-                  positions =
-                      Arrays.stream(positionsStr.split(","))
-                          .map(String::trim)
-                          .map(Integer::parseInt)
-                          .collect(Collectors.toList());
+            @Override
+            public int getBatchSize() {
+              return candidateDocIds.size();
+            }
+          });
+      stepEndTime = System.currentTimeMillis();
+      System.out.println(
+          String.format(
+              "3b. Temp Table Population (%d IDs): %d ms",
+              candidateDocIds.size(), (stepEndTime - stepStartTime)));
+
+      stepStartTime = System.currentTimeMillis();
+      String idPlaceholders =
+          "(" + String.join(",", Collections.nCopies(wordIdToWord.size(), "?")) + ")";
+      String sql =
+          "SELECT d.id AS document_id, d.url, d.title, fw.word_id, fw.section, "
+              + "d.document_size, d.description, fw.positions "
+              + "FROM documents d "
+              + "JOIN ( "
+              + "  SELECT dw.document_id, dw.word_id, dw.section, GROUP_CONCAT(dw.position) AS positions "
+              + "  FROM document_words dw "
+              + "  JOIN temp_candidate_ids t ON dw.document_id = t.id "
+              + "  WHERE dw.word_id IN "
+              + idPlaceholders
+              + " "
+              + "  GROUP BY dw.document_id, dw.word_id, dw.section "
+              + ") AS fw "
+              + "  ON fw.document_id = d.id";
+
+      Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
+      jdbcTemplate.query(
+          sql,
+          ps -> {
+            int i = 1;
+            for (Integer wordId : wordIdToWord.keySet()) {
+              ps.setInt(i++, wordId);
+            }
+          },
+          (ResultSetExtractor<Void>)
+              rs -> {
+                while (rs.next()) {
+                  int docId = rs.getInt("document_id");
+                  int wordId = rs.getInt("word_id");
+                  String word = wordIdToWord.get(wordId);
+                  String section = rs.getString("section");
+                  String positionsStr = rs.getString("positions");
+                  List<Integer> positions = new ArrayList<>();
+                  if (positionsStr != null && !positionsStr.isEmpty()) {
+                    positions =
+                        Arrays.stream(positionsStr.split(","))
+                            .map(String::trim)
+                            .map(Integer::parseInt)
+                            .collect(Collectors.toList());
+                  }
+                  Pair<Integer, Integer> key = Pair.of(docId, wordId);
+                  DocumentTermBuilder builder =
+                      builders.computeIfAbsent(
+                          key,
+                          k -> {
+                            try {
+                              return new DocumentTermBuilder(
+                                  word,
+                                  docId,
+                                  rs.getString("url"),
+                                  rs.getString("title"),
+                                  rs.getInt("document_size"),
+                                  rs.getString("description"));
+                            } catch (SQLException e) {
+                              throw new RuntimeException(e);
+                            }
+                          });
+                  builder.addPositions(section, positions);
                 }
+                return null;
+              });
+      stepEndTime = System.currentTimeMillis();
+      System.out.println(
+          String.format(
+              "4. Main Relational Query (Nested Plan): %d ms", (stepEndTime - stepStartTime)));
 
-                Pair<Integer, Integer> key = Pair.of(docId, wordId);
-                DocumentTermBuilder builder =
-                    builders.computeIfAbsent(
-                        key,
-                        k -> {
-                          try {
-                            return new DocumentTermBuilder(
-                                word,
-                                docId,
-                                rs.getString("url"),
-                                rs.getString("title"),
-                                rs.getInt("document_size"),
-                                description);
-                          } catch (SQLException e) {
-                            throw new RuntimeException(e);
-                          }
-                        });
+      stepStartTime = System.currentTimeMillis();
+      result =
+          builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
+      stepEndTime = System.currentTimeMillis();
+      System.out.println(
+          String.format("5. Final Java Object Assembly: %d ms", (stepEndTime - stepStartTime)));
 
-                builder.addPositions(section, positions);
-              }
-              return null;
-            });
+    } finally {
+      // cleanup temp table
+      stepStartTime = System.currentTimeMillis();
+      jdbcTemplate.execute("DROP TABLE IF EXISTS temp_candidate_ids");
+      stepEndTime = System.currentTimeMillis();
+      System.out.println(
+          String.format("6. Temp Table Cleanup: %d ms", (stepEndTime - stepStartTime)));
+    }
 
-    return builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
+    long totalEndTime = System.currentTimeMillis();
+    System.out.println(
+        String.format("--- Total function time: %d ms ---", (totalEndTime - totalStartTime)));
+    return result;
   }
 
   public Map<String, Integer> getTermFrequencyAcrossDocuments(List<String> queryTerms) {
@@ -435,19 +511,23 @@ public class DatabaseHelper {
   }
 
   public Map<Integer, Double> getPageRank(List<Integer> docIds) {
+    if (docIds.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
     String sql =
         "SELECT id, page_rank FROM documents WHERE id IN ("
             + String.join(",", Collections.nCopies(docIds.size(), "?"))
             + ")";
     Map<Integer, Double> pageRankMap = new HashMap<>();
+
     jdbcTemplate.query(
         sql,
-        (PreparedStatementSetter)
-            ps -> {
-              for (int i = 0; i < docIds.size(); i++) {
-                ps.setInt(i + 1, docIds.get(i));
-              }
-            },
+        ps -> {
+          for (int i = 0; i < docIds.size(); i++) {
+            ps.setInt(i + 1, docIds.get(i));
+          }
+        },
         (ResultSetExtractor<Void>)
             rs -> {
               while (rs.next()) {
@@ -457,6 +537,7 @@ public class DatabaseHelper {
               }
               return null;
             });
+
     return pageRankMap;
   }
 
@@ -564,5 +645,10 @@ public class DatabaseHelper {
             });
 
     return result;
+  }
+
+  public void updateFTSEntry(int documentId, String ftsContent) {
+    String insertSql = "INSERT INTO documents_fts(rowid, content) VALUES(?, ?)";
+    jdbcTemplate.update(insertSql, documentId, ftsContent);
   }
 }
