@@ -80,6 +80,9 @@ public class Indexer {
             tokenizer.tokenizeWithPositions(
                 title, pos, words, stems, positions, sections, Section.TITLE);
 
+      StringBuilder ftsContent = new StringBuilder();
+      StringBuilder fullContent = new StringBuilder();
+      ftsContent.append(title).append(" ").append(description);
       for (Element el : htmlDoc.select("* :not(script):not(style)")) {
         if (el.tagName().equals("title") || el.tagName().equals("meta") || el.ownText().isEmpty())
           continue;
@@ -87,7 +90,7 @@ public class Indexer {
         Section sec = el.tagName().matches("h[1-6]") ? Section.HEADER : Section.BODY;
         pos =
             tokenizer.tokenizeWithPositions(el.text(), pos, words, stems, positions, sections, sec);
-
+        fullContent.append(el.text()).append(" ");
         // Process in batches to avoid going out of memory
         if (words.size() >= BATCH_SIZE) {
           processBatch(document.getId(), words, stems, positions, sections);
@@ -117,9 +120,7 @@ public class Indexer {
         ConsoleColors.printSuccess("Indexer");
         System.out.println("Indexing completed in " + elapsed + " ms");
 
-        StringBuilder ftsContent = new StringBuilder();
-        ftsContent.append(title).append(" ").append(description);
-
+        ftsContent.append(fullContent.toString().trim());
         databaseHelper.updateFTSEntry(document.getId(), ftsContent.toString().trim());
 
         ConsoleColors.printInfo("Indexer");

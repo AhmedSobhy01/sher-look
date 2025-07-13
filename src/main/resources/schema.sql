@@ -38,8 +38,6 @@ CREATE TABLE IF NOT EXISTS links (
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
-    title,
-    description,
     content
 );
 

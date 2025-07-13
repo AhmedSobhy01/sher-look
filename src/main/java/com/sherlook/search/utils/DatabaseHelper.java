@@ -647,6 +647,7 @@ public class DatabaseHelper {
     return result;
   }
 
+  @Transactional
   public void updateFTSEntry(int documentId, String ftsContent) {
     String insertSql = "INSERT INTO documents_fts(rowid, content) VALUES(?, ?)";
     jdbcTemplate.update(insertSql, documentId, ftsContent);
