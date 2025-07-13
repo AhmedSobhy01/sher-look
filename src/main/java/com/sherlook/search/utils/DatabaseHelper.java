@@ -1,12 +1,5 @@
 package com.sherlook.search.utils;
 
-import com.sherlook.search.indexer.Document;
-import com.sherlook.search.indexer.DocumentWord;
-import com.sherlook.search.indexer.Section;
-import com.sherlook.search.indexer.Word;
-import com.sherlook.search.ranker.DocumentTerm;
-import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
-import com.sherlook.search.ranker.Link;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -18,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
@@ -25,6 +19,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.sherlook.search.indexer.Document;
+import com.sherlook.search.indexer.DocumentWord;
+import com.sherlook.search.indexer.Section;
+import com.sherlook.search.indexer.Word;
+import com.sherlook.search.ranker.DocumentTerm;
+import com.sherlook.search.ranker.DocumentTerm.DocumentTermBuilder;
+import com.sherlook.search.ranker.Link;
 
 @Component
 public class DatabaseHelper {
@@ -42,8 +44,7 @@ public class DatabaseHelper {
   @Transactional
   public void insertDocument(
       String url, String title, String description, String filePath, String hash) {
-    String sql =
-        """
+    String sql = """
         INSERT INTO documents (url, title, description, file_path, document_hash, crawl_time)
         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """;
@@ -83,26 +84,24 @@ public class DatabaseHelper {
   }
 
   public List<DocumentWord> getDocumentWords() {
-    String sql =
-        "SELECT d.id AS document_id, d.url, d.title, d.description, d.file_path, d.crawl_time, "
-            + "w.id AS word_id, w.word, dw.position, dw.section "
-            + "FROM documents d "
-            + "JOIN document_words dw ON d.id = dw.document_id "
-            + "JOIN words w ON dw.word_id = w.id "
-            + "ORDER BY d.id, dw.position";
+    String sql = "SELECT d.id AS document_id, d.url, d.title, d.description, d.file_path, d.crawl_time, "
+        + "w.id AS word_id, w.word, dw.position, dw.section "
+        + "FROM documents d "
+        + "JOIN document_words dw ON d.id = dw.document_id "
+        + "JOIN words w ON dw.word_id = w.id "
+        + "ORDER BY d.id, dw.position";
 
     return jdbcTemplate.query(
         sql,
         (rs, rowNum) -> {
           Word word = new Word(rs.getInt("word_id"), rs.getString("word"));
-          Document document =
-              new Document(
-                  rs.getInt("document_id"),
-                  rs.getString("url"),
-                  rs.getString("title"),
-                  rs.getString("description"),
-                  rs.getString("file_path"),
-                  rs.getTimestamp("crawl_time"));
+          Document document = new Document(
+              rs.getInt("document_id"),
+              rs.getString("url"),
+              rs.getString("title"),
+              rs.getString("description"),
+              rs.getString("file_path"),
+              rs.getTimestamp("crawl_time"));
 
           return new DocumentWord(
               document, word, rs.getInt("position"), Section.fromString(rs.getString("section")));
@@ -124,14 +123,13 @@ public class DatabaseHelper {
 
     return jdbcTemplate.query(
         sql,
-        (rs, rowNum) ->
-            new Document(
-                rs.getInt("id"),
-                rs.getString("url"),
-                rs.getString("title"),
-                rs.getString("description"),
-                rs.getString("file_path"),
-                rs.getTimestamp("crawl_time")));
+        (rs, rowNum) -> new Document(
+            rs.getInt("id"),
+            rs.getString("url"),
+            rs.getString("title"),
+            rs.getString("description"),
+            rs.getString("file_path"),
+            rs.getTimestamp("crawl_time")));
   }
 
   public void insertDocumentWord(int documentId, String word, int position, Section section) {
@@ -146,8 +144,7 @@ public class DatabaseHelper {
       wordId = jdbcTemplate.queryForObject("SELECT last_insert_rowid()", Integer.class);
     }
 
-    sql =
-        "INSERT INTO document_words (document_id, word_id, position, section) VALUES (?, ?, ?, ?)";
+    sql = "INSERT INTO document_words (document_id, word_id, position, section) VALUES (?, ?, ?, ?)";
     jdbcTemplate.update(sql, documentId, wordId, position, section.toString());
   }
 
@@ -170,7 +167,8 @@ public class DatabaseHelper {
 
   public Map<String, Integer> getOrCreateWordIds(List<String> words, List<String> stems) {
     Map<String, Integer> wordIds = new HashMap<>();
-    if (words.isEmpty() || words.size() != stems.size()) return wordIds;
+    if (words.isEmpty() || words.size() != stems.size())
+      return wordIds;
 
     Set<String> uniqueWords = new HashSet<>(words);
 
@@ -208,16 +206,15 @@ public class DatabaseHelper {
     if (!uniqueWords.isEmpty()) {
       List<Object[]> newWords = new ArrayList<>();
       for (String word : uniqueWords)
-        newWords.add(new Object[] {word, wordToStem.get(word), wordCounts.get(word)});
+        newWords.add(new Object[] { word, wordToStem.get(word), wordCounts.get(word) });
 
       jdbcTemplate.batchUpdate("INSERT INTO words (word, stem, count) VALUES (?, ?, ?)", newWords);
 
-      List<Map<String, Object>> insertedWords =
-          jdbcTemplate.queryForList(
-              "SELECT id, word FROM words WHERE word IN ("
-                  + String.join(",", Collections.nCopies(uniqueWords.size(), "?"))
-                  + ")",
-              uniqueWords.toArray());
+      List<Map<String, Object>> insertedWords = jdbcTemplate.queryForList(
+          "SELECT id, word FROM words WHERE word IN ("
+              + String.join(",", Collections.nCopies(uniqueWords.size(), "?"))
+              + ")",
+          uniqueWords.toArray());
 
       insertedWords.forEach(
           row -> {
@@ -244,7 +241,8 @@ public class DatabaseHelper {
     if (words.isEmpty()
         || words.size() != positions.size()
         || words.size() != sections.size()
-        || words.size() != stems.size()) return;
+        || words.size() != stems.size())
+      return;
 
     Map<String, Integer> wordIds = getOrCreateWordIds(words, stems);
 
@@ -252,7 +250,7 @@ public class DatabaseHelper {
     for (int i = 0; i < words.size(); i++) {
       batch.add(
           new Object[] {
-            documentId, wordIds.get(words.get(i)), positions.get(i), sections.get(i).toString()
+              documentId, wordIds.get(words.get(i)), positions.get(i), sections.get(i).toString()
           });
     }
 
@@ -273,8 +271,8 @@ public class DatabaseHelper {
     long stepStartTime = System.currentTimeMillis();
     String ftsQuery = String.join(" OR ", queryTerms);
     String ftsCandidateSql = "SELECT rowid FROM documents_fts WHERE documents_fts MATCH ?";
-    List<Integer> candidateDocIds =
-        jdbcTemplate.queryForList(ftsCandidateSql, new Object[] {ftsQuery}, Integer.class);
+    List<Integer> candidateDocIds = jdbcTemplate.queryForList(ftsCandidateSql, new Object[] { ftsQuery },
+        Integer.class);
     long stepEndTime = System.currentTimeMillis();
     System.out.println(
         String.format(
@@ -288,8 +286,7 @@ public class DatabaseHelper {
     // get word ids
     stepStartTime = System.currentTimeMillis();
     Map<Integer, String> wordIdToWord = new HashMap<>();
-    String wordPlaceholders =
-        "(" + String.join(",", Collections.nCopies(queryTerms.size(), "?")) + ")";
+    String wordPlaceholders = "(" + String.join(",", Collections.nCopies(queryTerms.size(), "?")) + ")";
     String wordIdSql = "SELECT id, word FROM words WHERE word IN " + wordPlaceholders;
     Object[] queryParams = queryTerms.toArray();
     try {
@@ -343,22 +340,16 @@ public class DatabaseHelper {
               candidateDocIds.size(), (stepEndTime - stepStartTime)));
 
       stepStartTime = System.currentTimeMillis();
-      String idPlaceholders =
-          "(" + String.join(",", Collections.nCopies(wordIdToWord.size(), "?")) + ")";
-      String sql =
-          "SELECT d.id AS document_id, d.url, d.title, fw.word_id, fw.section, "
-              + "d.document_size, d.description, fw.positions "
-              + "FROM documents d "
-              + "JOIN ( "
-              + "  SELECT dw.document_id, dw.word_id, dw.section, GROUP_CONCAT(dw.position) AS positions "
-              + "  FROM document_words dw "
-              + "  JOIN temp_candidate_ids t ON dw.document_id = t.id "
-              + "  WHERE dw.word_id IN "
-              + idPlaceholders
-              + " "
-              + "  GROUP BY dw.document_id, dw.word_id, dw.section "
-              + ") AS fw "
-              + "  ON fw.document_id = d.id";
+      String idPlaceholders = "(" + String.join(",", Collections.nCopies(wordIdToWord.size(), "?")) + ")";
+      String sql = "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, "
+          + "d.document_size, d.description, GROUP_CONCAT(dw.position) AS positions "
+          + "FROM document_words dw "
+          + "JOIN documents d ON dw.document_id = d.id "
+          + "JOIN temp_candidate_ids t ON dw.document_id = t.id "
+          + "WHERE dw.word_id IN "
+          + idPlaceholders
+          + " "
+          + "GROUP BY d.id, dw.word_id, dw.section";
 
       Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
       jdbcTemplate.query(
@@ -369,51 +360,47 @@ public class DatabaseHelper {
               ps.setInt(i++, wordId);
             }
           },
-          (ResultSetExtractor<Void>)
-              rs -> {
-                while (rs.next()) {
-                  int docId = rs.getInt("document_id");
-                  int wordId = rs.getInt("word_id");
-                  String word = wordIdToWord.get(wordId);
-                  String section = rs.getString("section");
-                  String positionsStr = rs.getString("positions");
-                  List<Integer> positions = new ArrayList<>();
-                  if (positionsStr != null && !positionsStr.isEmpty()) {
-                    positions =
-                        Arrays.stream(positionsStr.split(","))
-                            .map(String::trim)
-                            .map(Integer::parseInt)
-                            .collect(Collectors.toList());
-                  }
-                  Pair<Integer, Integer> key = Pair.of(docId, wordId);
-                  DocumentTermBuilder builder =
-                      builders.computeIfAbsent(
-                          key,
-                          k -> {
-                            try {
-                              return new DocumentTermBuilder(
-                                  word,
-                                  docId,
-                                  rs.getString("url"),
-                                  rs.getString("title"),
-                                  rs.getInt("document_size"),
-                                  rs.getString("description"));
-                            } catch (SQLException e) {
-                              throw new RuntimeException(e);
-                            }
-                          });
-                  builder.addPositions(section, positions);
-                }
-                return null;
-              });
+          (ResultSetExtractor<Void>) rs -> {
+            while (rs.next()) {
+              int docId = rs.getInt("document_id");
+              int wordId = rs.getInt("word_id");
+              String word = wordIdToWord.get(wordId);
+              String section = rs.getString("section");
+              String positionsStr = rs.getString("positions");
+              List<Integer> positions = new ArrayList<>();
+              if (positionsStr != null && !positionsStr.isEmpty()) {
+                positions = Arrays.stream(positionsStr.split(","))
+                    .map(String::trim)
+                    .map(Integer::parseInt)
+                    .collect(Collectors.toList());
+              }
+              Pair<Integer, Integer> key = Pair.of(docId, wordId);
+              DocumentTermBuilder builder = builders.computeIfAbsent(
+                  key,
+                  k -> {
+                    try {
+                      return new DocumentTermBuilder(
+                          word,
+                          docId,
+                          rs.getString("url"),
+                          rs.getString("title"),
+                          rs.getInt("document_size"),
+                          rs.getString("description"));
+                    } catch (SQLException e) {
+                      throw new RuntimeException(e);
+                    }
+                  });
+              builder.addPositions(section, positions);
+            }
+            return null;
+          });
       stepEndTime = System.currentTimeMillis();
       System.out.println(
           String.format(
-              "4. Main Relational Query (Nested Plan): %d ms", (stepEndTime - stepStartTime)));
+              "4. Main Relational Query : %d ms", (stepEndTime - stepStartTime)));
 
       stepStartTime = System.currentTimeMillis();
-      result =
-          builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
+      result = builders.values().stream().map(DocumentTermBuilder::build).collect(Collectors.toList());
       stepEndTime = System.currentTimeMillis();
       System.out.println(
           String.format("5. Final Java Object Assembly: %d ms", (stepEndTime - stepStartTime)));
@@ -434,10 +421,9 @@ public class DatabaseHelper {
   }
 
   public Map<String, Integer> getTermFrequencyAcrossDocuments(List<String> queryTerms) {
-    String sql =
-        "SELECT w.word, w.count FROM words w WHERE w.word IN ("
-            + String.join(",", Collections.nCopies(queryTerms.size(), "?"))
-            + ")";
+    String sql = "SELECT w.word, w.count FROM words w WHERE w.word IN ("
+        + String.join(",", Collections.nCopies(queryTerms.size(), "?"))
+        + ")";
     List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, queryTerms.toArray());
     Map<String, Integer> wordFrequencies = new HashMap<>();
     for (Map<String, Object> row : rows) {
@@ -455,10 +441,9 @@ public class DatabaseHelper {
 
   public List<Link> getLinks() {
     List<Link> links = new ArrayList<>();
-    String sql =
-        "SELECT l.source_document_id, d.id as target_document_id"
-            + " FROM links l"
-            + " JOIN documents d ON l.target_url = d.url";
+    String sql = "SELECT l.source_document_id, d.id as target_document_id"
+        + " FROM links l"
+        + " JOIN documents d ON l.target_url = d.url";
     jdbcTemplate.query(
         sql,
         (rs, rowNum) -> {
@@ -515,10 +500,9 @@ public class DatabaseHelper {
       return Collections.emptyMap();
     }
 
-    String sql =
-        "SELECT id, page_rank FROM documents WHERE id IN ("
-            + String.join(",", Collections.nCopies(docIds.size(), "?"))
-            + ")";
+    String sql = "SELECT id, page_rank FROM documents WHERE id IN ("
+        + String.join(",", Collections.nCopies(docIds.size(), "?"))
+        + ")";
     Map<Integer, Double> pageRankMap = new HashMap<>();
 
     jdbcTemplate.query(
@@ -528,15 +512,14 @@ public class DatabaseHelper {
             ps.setInt(i + 1, docIds.get(i));
           }
         },
-        (ResultSetExtractor<Void>)
-            rs -> {
-              while (rs.next()) {
-                int documentId = rs.getInt("id");
-                double pageRank = rs.getDouble("page_rank");
-                pageRankMap.put(documentId, pageRank);
-              }
-              return null;
-            });
+        (ResultSetExtractor<Void>) rs -> {
+          while (rs.next()) {
+            int documentId = rs.getInt("id");
+            double pageRank = rs.getDouble("page_rank");
+            pageRankMap.put(documentId, pageRank);
+          }
+          return null;
+        });
 
     return pageRankMap;
   }
@@ -549,13 +532,13 @@ public class DatabaseHelper {
   @Transactional
   public void calculateIDF() {
     int totalDocCount = getTotalDocumentCount();
-    if (totalDocCount == 0) return;
+    if (totalDocCount == 0)
+      return;
 
-    String sql =
-        "SELECT w.id, COUNT(DISTINCT dw.document_id) as doc_frequency "
-            + "FROM words w "
-            + "JOIN document_words dw ON w.id = dw.word_id "
-            + "GROUP BY w.id";
+    String sql = "SELECT w.id, COUNT(DISTINCT dw.document_id) as doc_frequency "
+        + "FROM words w "
+        + "JOIN document_words dw ON w.id = dw.word_id "
+        + "GROUP BY w.id";
 
     List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 
@@ -572,10 +555,9 @@ public class DatabaseHelper {
   }
 
   public Map<String, Double> getIDF(List<String> queryTerms) {
-    String sql =
-        "SELECT w.word, w.idf FROM words w WHERE w.word IN ("
-            + String.join(",", Collections.nCopies(queryTerms.size(), "?"))
-            + ")";
+    String sql = "SELECT w.word, w.idf FROM words w WHERE w.word IN ("
+        + String.join(",", Collections.nCopies(queryTerms.size(), "?"))
+        + ")";
     List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, queryTerms.toArray());
     Map<String, Double> idfMap = new HashMap<>();
     for (Map<String, Object> row : rows) {
@@ -600,10 +582,9 @@ public class DatabaseHelper {
     }
 
     // Build dynamic query with parameters
-    StringBuilder sql =
-        new StringBuilder(
-            "SELECT dw.document_id, dw.position, w.word FROM document_words dw "
-                + "JOIN words w ON dw.word_id = w.id WHERE ");
+    StringBuilder sql = new StringBuilder(
+        "SELECT dw.document_id, dw.position, w.word FROM document_words dw "
+            + "JOIN words w ON dw.word_id = w.id WHERE ");
 
     List<Object> params = new ArrayList<>();
     boolean first = true;
@@ -632,17 +613,16 @@ public class DatabaseHelper {
             ps.setObject(i + 1, params.get(i));
           }
         },
-        (ResultSetExtractor<Void>)
-            rs -> {
-              while (rs.next()) {
-                int docId = rs.getInt("document_id");
-                int position = rs.getInt("position");
-                String word = rs.getString("word");
+        (ResultSetExtractor<Void>) rs -> {
+          while (rs.next()) {
+            int docId = rs.getInt("document_id");
+            int position = rs.getInt("position");
+            String word = rs.getString("word");
 
-                result.computeIfAbsent(docId, k -> new HashMap<>()).put(position, word);
-              }
-              return null;
-            });
+            result.computeIfAbsent(docId, k -> new HashMap<>()).put(position, word);
+          }
+          return null;
+        });
 
     return result;
   }
