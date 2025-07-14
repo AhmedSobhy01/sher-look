@@ -117,20 +117,19 @@ public class SearchController {
     System.out.println("Checking ranking cache...");
 
     boolean cacheHit = rankingCache.getIfPresent(cacheKey) != null;
+    ConsoleColors.printInfo("SearchController");
+    System.out.println(
+        cacheHit
+            ? "Cache " + ConsoleColors.BOLD_GREEN + "HIT" + ConsoleColors.RESET
+            : "Cache "
+                + ConsoleColors.BOLD_YELLOW
+                + "MISS"
+                + ConsoleColors.RESET
+                + " - Performing ranking");
     rankingResult =
         rankingCache.get(
             cacheKey,
             key -> {
-              ConsoleColors.printInfo("SearchController");
-              System.out.println(
-                  cacheHit
-                      ? "Cache " + ConsoleColors.BOLD_GREEN + "HIT" + ConsoleColors.RESET
-                      : "Cache "
-                          + ConsoleColors.BOLD_YELLOW
-                          + "MISS"
-                          + ConsoleColors.RESET
-                          + " - Performing ranking");
-
               if (isPhraseSearch) {
                 return ranker.rankAndStoreTotalDocumentsPhrases(phrases, operators);
               } else {

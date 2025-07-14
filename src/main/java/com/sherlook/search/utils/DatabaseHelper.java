@@ -346,19 +346,15 @@ public class DatabaseHelper {
       String idPlaceholders =
           "(" + String.join(",", Collections.nCopies(wordIdToWord.size(), "?")) + ")";
       String sql =
-          "SELECT d.id AS document_id, d.url, d.title, fw.word_id, fw.section, "
-              + "d.document_size, d.description, fw.positions "
-              + "FROM documents d "
-              + "JOIN ( "
-              + "  SELECT dw.document_id, dw.word_id, dw.section, GROUP_CONCAT(dw.position) AS positions "
-              + "  FROM document_words dw "
-              + "  JOIN temp_candidate_ids t ON dw.document_id = t.id "
-              + "  WHERE dw.word_id IN "
+          "SELECT d.id AS document_id, d.url, d.title, dw.word_id, dw.section, "
+              + "d.document_size, d.description, GROUP_CONCAT(dw.position) AS positions "
+              + "FROM document_words dw "
+              + "JOIN documents d ON dw.document_id = d.id "
+              + "JOIN temp_candidate_ids t ON dw.document_id = t.id "
+              + "WHERE dw.word_id IN "
               + idPlaceholders
               + " "
-              + "  GROUP BY dw.document_id, dw.word_id, dw.section "
-              + ") AS fw "
-              + "  ON fw.document_id = d.id";
+              + "GROUP BY d.id, dw.word_id, dw.section";
 
       Map<Pair<Integer, Integer>, DocumentTermBuilder> builders = new HashMap<>();
       jdbcTemplate.query(
@@ -408,8 +404,7 @@ public class DatabaseHelper {
               });
       stepEndTime = System.currentTimeMillis();
       System.out.println(
-          String.format(
-              "4. Main Relational Query (Nested Plan): %d ms", (stepEndTime - stepStartTime)));
+          String.format("4. Main Relational Query : %d ms", (stepEndTime - stepStartTime)));
 
       stepStartTime = System.currentTimeMillis();
       result =
@@ -647,6 +642,7 @@ public class DatabaseHelper {
     return result;
   }
 
+  @Transactional
   public void updateFTSEntry(int documentId, String ftsContent) {
     String insertSql = "INSERT INTO documents_fts(rowid, content) VALUES(?, ?)";
     jdbcTemplate.update(insertSql, documentId, ftsContent);

@@ -571,7 +571,7 @@ public class Ranker {
     // Measure database call time
     long dbStart = System.currentTimeMillis();
     Map<Integer, Map<Integer, String>> surroundingWords =
-        databaseHelper.getWordsAroundPositions(docPositions, 10);
+        databaseHelper.getWordsAroundPositions(docPositions, 15);
     long dbEnd = System.currentTimeMillis();
 
     ConsoleColors.printInfo("Ranker");
@@ -593,7 +593,7 @@ public class Ranker {
       Collections.sort(positions);
 
       // Build snippet with highlighted terms
-      StringBuilder snippet = new StringBuilder("... ");
+      StringBuilder snippet = new StringBuilder("");
       Set<String> queryLower =
           queryTerms.stream().map(String::toLowerCase).collect(Collectors.toSet());
 
