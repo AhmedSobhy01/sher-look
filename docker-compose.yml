@@ -1,36 +1,30 @@
 services:
-    app:
-        build: .
-        ports:
-            - "8080:8080"
-        depends_on:
-            - database
-        environment:
-            - SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/sher-look.db
-            - crawler.savepath=/app/crawled
-            - crawler.url-queue-file=/app/data/url-queue.txt
-            - crawler.start-pages=/app/data/start-pages.txt
-        volumes:
-            - ./data:/app/data
-            - ./crawled:/app/crawled
-        command: ["serve"]
+  app:
+    build: .
+    ports:
+      - "6000:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/sher-look.db
+      - crawler.savepath=/app/crawled
+      - crawler.url-queue-file=/app/data/url-queue.txt
+      - crawler.start-pages=/app/data/start-pages.txt
+    volumes:
+      - ./data:/app/data
+      - ./crawled:/app/crawled
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    command: ["serve"]
 
-    client:
-        build:
-            context: ./client
-        ports:
-            - "5173:80"
-        environment:
-            - VITE_API_URL=http://localhost:8080
-        depends_on:
-            - app
-
-    database:
-        image: keinos/sqlite3:latest
-        volumes:
-            - ./data:/app/data
-        command: ["echo", "SQLite database is ready."]
-
-volumes:
-    data:
-    crawled:
+  client:
+    build:
+      context: ./client
+      args:
+        - VITE_API_URL=https://sherlook-api.ahmedsobhy.net
+    ports:
+      - "6001:80"
+    depends_on:
+      - app
+    restart: always

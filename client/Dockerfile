@@ -1,13 +1,14 @@
-FROM node:18-alpine as build
+FROM node:20-slim as build
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN rm -rf node_modules package-lock.json && npm install
 
 COPY . .
 
-ENV VITE_API_URL=http://localhost:8080
+ARG VITE_API_URL=https://sherlook-api.ahmedsobhy.net
+ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
